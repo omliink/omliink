@@ -110,6 +110,23 @@ export async function updateApplicationStatus(
           user_2_id: application.candidate_id,
         })
       }
+
+      // OMLIINK requires a visio between employer and candidate before a
+      // mission can proceed: block the mission on that step and create the
+      // meeting shell (no date yet — the employer proposes one next).
+      const meetingId = crypto.randomUUID()
+      const roomName = `mission-${missionId}-${meetingId}`
+
+      await supabase.from('visio_meetings').insert({
+        id: meetingId,
+        mission_id: missionId,
+        employer_id: mission.employer_id,
+        candidate_id: application.candidate_id,
+        room_name: roomName,
+        status: 'proposed',
+      })
+
+      await supabase.from('missions').update({ status: 'visio_scheduled' }).eq('id', missionId)
     }
   }
 

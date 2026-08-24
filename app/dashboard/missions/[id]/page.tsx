@@ -2,15 +2,19 @@ import { notFound, redirect } from 'next/navigation'
 import StatusBadge from '@/components/ui/StatusBadge'
 import ApplyForm from '@/components/dashboard/ApplyForm'
 import ApplicationsList from '@/components/dashboard/ApplicationsList'
+import VisioSection from '@/components/dashboard/VisioSection'
+import ContractSection from '@/components/dashboard/ContractSection'
 import {
   getApplicationForMissionAndCandidate,
   getApplicationsForMission,
   getCandidateProfilesByUserIds,
   getCategories,
+  getContractByMissionId,
   getCurrentUser,
   getMissionById,
   getProfile,
   getProfilesByIds,
+  getVisioMeetingByMissionId,
 } from '@/lib/dashboard-data'
 
 interface MissionDetailPageProps {
@@ -59,6 +63,17 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
   const candidateProfileById = new Map(candidateExtendedProfiles.map((p) => [p.user_id, p]))
 
   const categoryName = categories.find((category) => category.id === mission.category_id)?.name
+
+  const [visioMeeting, contract] = await Promise.all([
+    getVisioMeetingByMissionId(mission.id),
+    getContractByMissionId(mission.id),
+  ])
+  const isVisioParticipant = isOwner || Boolean(visioMeeting && visioMeeting.candidate_id === user.id)
+  // This Server Component renders once per request — there's no re-render to
+  // go stale, so the purity rule (aimed at memoized client components) does
+  // not apply here.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now()
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -124,6 +139,14 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             )}
           </div>
         </div>
+      )}
+
+      {visioMeeting && isVisioParticipant && (
+        <VisioSection meeting={visioMeeting} missionId={mission.id} isEmployerViewer={isOwner} now={now} />
+      )}
+
+      {contract && isVisioParticipant && (
+        <ContractSection contract={contract} mission={mission} isEmployerViewer={isOwner} />
       )}
     </div>
   )

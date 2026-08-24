@@ -11,6 +11,8 @@ type EmployerProfile = Database['public']['Tables']['employer_profiles']['Row']
 type Conversation = Database['public']['Tables']['conversations']['Row']
 type Message = Database['public']['Tables']['messages']['Row']
 type Notification = Database['public']['Tables']['notifications']['Row']
+type VisioMeeting = Database['public']['Tables']['visio_meetings']['Row']
+type Contract = Database['public']['Tables']['contracts']['Row']
 
 export const getCurrentUser = cache(async () => {
   const supabase = await createServerSupabaseClient()
@@ -173,6 +175,24 @@ export async function getMessagesForConversation(conversationId: string): Promis
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true })
   return data ?? []
+}
+
+export async function getVisioMeetingByMissionId(missionId: string): Promise<VisioMeeting | null> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('visio_meetings').select('*').eq('mission_id', missionId).maybeSingle()
+  return data
+}
+
+export async function getVisioMeetingById(id: string): Promise<VisioMeeting | null> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('visio_meetings').select('*').eq('id', id).maybeSingle()
+  return data
+}
+
+export async function getContractByMissionId(missionId: string): Promise<Contract | null> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('contracts').select('*').eq('mission_id', missionId).maybeSingle()
+  return data
 }
 
 export async function getUnreadMessagesForConversations(
