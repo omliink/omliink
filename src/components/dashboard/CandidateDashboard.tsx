@@ -2,11 +2,13 @@ import MissionCard from '@/components/ui/MissionCard'
 import EmptyState from '@/components/ui/EmptyState'
 import StatusBadge from '@/components/ui/StatusBadge'
 import CategoryFilter from './CategoryFilter'
+import ActiveMissionCard from './ActiveMissionCard'
 import {
   getCandidateApplications,
   getCategories,
   getMissionsByIds,
   getPublishedMissions,
+  getVisioMeetingsByMissionIds,
 } from '@/lib/dashboard-data'
 
 interface CandidateDashboardProps {
@@ -33,12 +35,43 @@ export default async function CandidateDashboard({ candidateId, fullName, catego
   const appliedMissions = await getMissionsByIds(myApplications.map((application) => application.mission_id))
   const missionById = new Map(appliedMissions.map((mission) => [mission.id, mission]))
 
+  const acceptedMissionIds = myApplications
+    .filter((application) => application.status === 'accepted')
+    .map((application) => application.mission_id)
+  const activeMissions = acceptedMissionIds
+    .map((id) => missionById.get(id))
+    .filter((mission): mission is NonNullable<typeof mission> => Boolean(mission))
+  const visioMeetings = await getVisioMeetingsByMissionIds(acceptedMissionIds)
+  const visioMeetingByMissionId = new Map(visioMeetings.map((meeting) => [meeting.mission_id, meeting]))
+
+  // This Server Component renders once per request — there's no re-render to
+  // go stale, so the purity rule (aimed at memoized client components) does
+  // not apply here.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now()
+
   return (
     <section className="flex flex-col gap-10">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Bonjour {fullName}</h1>
         <p className="mt-1 text-sm text-gray-600">Découvrez les missions disponibles.</p>
       </div>
+
+      {activeMissions.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Mes missions en cours</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {activeMissions.map((mission) => (
+              <ActiveMissionCard
+                key={mission.id}
+                mission={mission}
+                meeting={visioMeetingByMissionId.get(mission.id)}
+                now={now}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <div className="flex flex-wrap items-center justify-between gap-4">

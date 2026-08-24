@@ -183,6 +183,13 @@ export async function getVisioMeetingByMissionId(missionId: string): Promise<Vis
   return data
 }
 
+export async function getVisioMeetingsByMissionIds(missionIds: string[]): Promise<VisioMeeting[]> {
+  if (missionIds.length === 0) return []
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('visio_meetings').select('*').in('mission_id', missionIds)
+  return data ?? []
+}
+
 export async function getVisioMeetingById(id: string): Promise<VisioMeeting | null> {
   const supabase = await createServerSupabaseClient()
   const { data } = await supabase.from('visio_meetings').select('*').eq('id', id).maybeSingle()

@@ -1,7 +1,15 @@
 import Link from 'next/link'
 import MissionCard from '@/components/ui/MissionCard'
 import EmptyState from '@/components/ui/EmptyState'
-import { getApplicationsForMissions, getCategories, getEmployerMissions } from '@/lib/dashboard-data'
+import ActiveMissionCard from './ActiveMissionCard'
+import {
+  getApplicationsForMissions,
+  getCategories,
+  getEmployerMissions,
+  getVisioMeetingsByMissionIds,
+} from '@/lib/dashboard-data'
+
+const PENDING_VISIO_STATUSES = new Set(['proposed', 'accepted', 'in_progress'])
 
 interface EmployerDashboardProps {
   employerId: string
@@ -17,8 +25,13 @@ function MissionsIcon() {
 }
 
 export default async function EmployerDashboard({ employerId, fullName }: EmployerDashboardProps) {
-  const [missions, categories] = await Promise.all([getEmployerMissions(employerId), getCategories()])
-  const applications = await getApplicationsForMissions(missions.map((mission) => mission.id))
+  const missions = await getEmployerMissions(employerId)
+  const missionIds = missions.map((mission) => mission.id)
+  const [categories, applications, visioMeetings] = await Promise.all([
+    getCategories(),
+    getApplicationsForMissions(missionIds),
+    getVisioMeetingsByMissionIds(missionIds),
+  ])
 
   const categoryMap = new Map(categories.map((category) => [category.id, category.name]))
   const applicationsCountByMission = new Map<string, number>()
@@ -32,6 +45,15 @@ export default async function EmployerDashboard({ employerId, fullName }: Employ
   const activeMissionsCount = missions.filter(
     (mission) => mission.status === 'published' || mission.status === 'in_progress'
   ).length
+
+  const missionById = new Map(missions.map((mission) => [mission.id, mission]))
+  const pendingVisioMeetings = visioMeetings.filter((meeting) => PENDING_VISIO_STATUSES.has(meeting.status))
+
+  // This Server Component renders once per request — there's no re-render to
+  // go stale, so the purity rule (aimed at memoized client components) does
+  // not apply here.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now()
 
   return (
     <section>
@@ -58,6 +80,19 @@ export default async function EmployerDashboard({ employerId, fullName }: Employ
           <p className="mt-1 text-2xl font-bold text-gray-900">{applications.length}</p>
         </div>
       </div>
+
+      {pendingVisioMeetings.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-900">Visioconférences</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {pendingVisioMeetings.map((meeting) => {
+              const mission = missionById.get(meeting.mission_id)
+              if (!mission) return null
+              return <ActiveMissionCard key={meeting.id} mission={mission} meeting={meeting} now={now} />
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="mt-8">
         <h2 className="text-lg font-semibold text-gray-900">Mes missions</h2>
