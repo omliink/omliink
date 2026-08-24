@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SignupIllustration from '@/components/SignupIllustration'
 
@@ -50,7 +49,6 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
 
   const { signUp } = useAuth()
-  const router = useRouter()
 
   const passwordChecks = [
     { key: 'length', label: '12 caractères', ok: hasMinLength(password) },
@@ -108,12 +106,25 @@ export default function SignupPage() {
 
     setLoading(true)
     try {
-      await signUp(email, password, {
+      const { session } = await signUp(email, password, {
         fullName: fullName.trim(),
         phone: phone.trim(),
         accountType: accountType as AccountType,
       })
-      router.push('/auth/login?message=Vérifiez votre email pour confirmer votre compte')
+
+      // Full navigation rather than router.push(): the server (proxy.ts +
+      // Server Components) needs to see the just-set session cookie on a
+      // fresh request. A client-side push/refresh can race the in-flight
+      // transition and leave the page blank until a manual reload.
+      if (session) {
+        // Email confirmation is disabled: a session is already active, so we
+        // can go straight to the dashboard instead of bouncing through login.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.href = '/dashboard'
+      } else {
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+        window.location.href = '/auth/login?message=Vérifiez votre email pour confirmer votre compte'
+      }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Échec de l'inscription")
     } finally {

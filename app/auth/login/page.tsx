@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/lib/auth-context'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import LoginIllustration from '@/components/LoginIllustration'
 
@@ -18,7 +17,6 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { signIn } = useAuth()
-  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,10 +25,14 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password)
-      router.push('/')
+      // Full navigation rather than router.push(): the server (proxy.ts +
+      // Server Components) needs to see the just-set session cookie on a
+      // fresh request. A client-side push/refresh can race the in-flight
+      // transition and leave the page blank until a manual reload.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = '/dashboard'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign in')
-    } finally {
       setLoading(false)
     }
   }

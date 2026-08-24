@@ -1,18 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function LogoutButton() {
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   const handleLogout = async () => {
     setLoading(true)
     await supabase.auth.signOut()
-    router.push('/auth/login')
-    router.refresh()
+    // Full navigation rather than router.push(): the server (proxy.ts +
+    // Server Components) needs to see the cleared session cookie on a fresh
+    // request. A client-side push/refresh can race the in-flight transition
+    // and leave the page blank until a manual reload.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = '/auth/login'
   }
 
   return (

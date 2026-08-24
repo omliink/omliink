@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 type AccountType = 'employer' | 'candidate'
@@ -18,7 +17,6 @@ export default function OnboardingForm({ userId, email, fullName, phone, initial
   const [accountType, setAccountType] = useState<AccountType | null>(initialAccountType)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -78,11 +76,13 @@ export default function OnboardingForm({ userId, email, fullName, phone, initial
             )
       if (subProfileError) throw subProfileError
 
-      router.push('/dashboard')
-      router.refresh()
+      // Full navigation rather than router.push(): the dashboard layout reads
+      // the profile server-side, and a client-side push/refresh can race the
+      // in-flight transition and leave the page blank until a manual reload.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = '/dashboard'
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Une erreur est survenue')
-    } finally {
       setLoading(false)
     }
   }
