@@ -1,17 +1,25 @@
 import StatusBadge from '@/components/ui/StatusBadge'
 import EmptyState from '@/components/ui/EmptyState'
 import ApplicationActions from './ApplicationActions'
+import CandidateProfileReveal from './CandidateProfileReveal'
 import type { Database } from '@/types/database.types'
 
 type Application = Database['public']['Tables']['applications']['Row']
+type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
 
 interface ApplicationsListProps {
   applications: Application[]
   missionId: string
   candidateNameById: Map<string, string>
+  candidateProfileById: Map<string, CandidateProfile>
 }
 
-export default function ApplicationsList({ applications, missionId, candidateNameById }: ApplicationsListProps) {
+export default function ApplicationsList({
+  applications,
+  missionId,
+  candidateNameById,
+  candidateProfileById,
+}: ApplicationsListProps) {
   if (applications.length === 0) {
     return (
       <div className="mt-4">
@@ -35,6 +43,9 @@ export default function ApplicationsList({ applications, missionId, candidateNam
             <p className="mt-1 text-xs text-gray-500">
               Envoyée le {new Date(application.applied_at).toLocaleDateString('fr-FR')}
             </p>
+            <div className="mt-2">
+              <CandidateProfileReveal profile={candidateProfileById.get(application.candidate_id) ?? null} />
+            </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-3">
             <StatusBadge status={application.status} />

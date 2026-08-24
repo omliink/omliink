@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { createMission, type CreateMissionState } from '@/lib/actions/missions'
+import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 import type { Database } from '@/types/database.types'
 
 type ServiceCategory = Database['public']['Tables']['service_categories']['Row']
@@ -85,22 +86,13 @@ export default function MissionForm({ categories }: MissionFormProps) {
         </select>
       </div>
 
-      <div>
-        <label htmlFor="location_address" className="mb-1 block text-sm font-medium text-gray-700">
-          Adresse
-        </label>
-        <input
-          id="location_address"
-          name="location_address"
-          type="text"
-          placeholder="12 rue de la Paix, 75002 Paris"
-          aria-describedby="location-hint"
-          className={inputClass}
-        />
-        <p id="location-hint" className="mt-1 text-xs text-gray-500">
-          Saisie libre pour l&apos;instant — la géolocalisation arrive bientôt.
-        </p>
-      </div>
+      <AddressAutocomplete
+        id="location_address"
+        name="location_address"
+        latName="location_lat"
+        lngName="location_lng"
+        label="Adresse"
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div>

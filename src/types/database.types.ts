@@ -372,6 +372,7 @@ type NotificationsRow = {
   is_read: boolean
   read_at: string | null
   created_at: string
+  updated_at: string
 }
 type NotificationsInsert = {
   id?: string
@@ -383,6 +384,7 @@ type NotificationsInsert = {
   is_read?: boolean
   read_at?: string | null
   created_at?: string
+  updated_at?: string
 }
 type NotificationsUpdate = Partial<NotificationsInsert>
 

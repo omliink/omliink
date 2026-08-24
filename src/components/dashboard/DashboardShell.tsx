@@ -4,22 +4,35 @@ import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import LogoutButton from './LogoutButton'
+import NotificationsBell from './NotificationsBell'
 import type { Database } from '@/types/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
+type Notification = Database['public']['Tables']['notifications']['Row']
 
 interface DashboardShellProps {
   profile: Profile
+  unreadMessagesCount: number
+  notifications: Notification[]
+  unreadNotificationsCount: number
   children: ReactNode
 }
 
-export default function DashboardShell({ profile, children }: DashboardShellProps) {
+export default function DashboardShell({
+  profile,
+  unreadMessagesCount,
+  notifications,
+  unreadNotificationsCount,
+  children,
+}: DashboardShellProps) {
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const links = [
     { href: '/dashboard', label: 'Tableau de bord' },
     ...(profile.is_employer ? [{ href: '/dashboard/missions/new', label: 'Nouvelle mission' }] : []),
+    { href: '/dashboard/messages', label: 'Messages', badge: unreadMessagesCount },
+    { href: '/dashboard/profile', label: 'Mon profil' },
   ]
 
   const displayName = profile.full_name ?? profile.email
@@ -28,17 +41,22 @@ export default function DashboardShell({ profile, children }: DashboardShellProp
   const navLinks = (
     <nav className="flex flex-col gap-1">
       {links.map((link) => {
-        const active = pathname === link.href
+        const active = pathname === link.href || (link.href !== '/dashboard' && pathname.startsWith(link.href))
         return (
           <Link
             key={link.href}
             href={link.href}
             onClick={() => setMenuOpen(false)}
-            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               active ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
             }`}
           >
             {link.label}
+            {Boolean(link.badge) && link.badge! > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff5a3d] px-1 text-[11px] font-semibold text-white">
+                {link.badge! > 9 ? '9+' : link.badge}
+              </span>
+            )}
           </Link>
         )
       })}
@@ -77,6 +95,7 @@ export default function DashboardShell({ profile, children }: DashboardShellProp
           <span className="text-sm font-semibold text-gray-900 md:hidden">OMLIINK</span>
 
           <div className="flex items-center gap-3">
+            <NotificationsBell notifications={notifications} unreadCount={unreadNotificationsCount} />
             <span className="hidden text-sm font-medium text-gray-700 sm:inline">{displayName}</span>
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
               {initials}

@@ -1,6 +1,12 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { getCurrentUser, getProfile } from '@/lib/dashboard-data'
+import {
+  getCurrentUser,
+  getProfile,
+  getRecentNotifications,
+  getUnreadMessagesCountForUser,
+  getUnreadNotificationsCountForUser,
+} from '@/lib/dashboard-data'
 import DashboardShell from '@/components/dashboard/DashboardShell'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -36,5 +42,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return <div className="min-h-screen bg-gray-50">{children}</div>
   }
 
-  return <DashboardShell profile={profile}>{children}</DashboardShell>
+  const [unreadMessagesCount, notifications, unreadNotificationsCount] = await Promise.all([
+    getUnreadMessagesCountForUser(user.id),
+    getRecentNotifications(user.id),
+    getUnreadNotificationsCountForUser(user.id),
+  ])
+
+  return (
+    <DashboardShell
+      profile={profile}
+      unreadMessagesCount={unreadMessagesCount}
+      notifications={notifications}
+      unreadNotificationsCount={unreadNotificationsCount}
+    >
+      {children}
+    </DashboardShell>
+  )
 }

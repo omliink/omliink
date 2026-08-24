@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createNotification } from '@/lib/notifications-helpers'
 
 export interface ApplyState {
   error?: string
@@ -25,6 +26,8 @@ export async function applyToMission(
 
   const coverLetter = String(formData.get('cover_letter') ?? '').trim()
 
+  const { data: mission } = await supabase.from('missions').select('employer_id, title').eq('id', missionId).maybeSingle()
+
   const { error } = await supabase.from('applications').insert({
     mission_id: missionId,
     candidate_id: user.id,
@@ -35,6 +38,16 @@ export async function applyToMission(
 
   if (error) {
     return { error: error.message }
+  }
+
+  if (mission) {
+    await createNotification(supabase, {
+      userId: mission.employer_id,
+      type: 'application_received',
+      title: 'Nouvelle candidature reçue',
+      message: `Vous avez reçu une nouvelle candidature pour "${mission.title}".`,
+      relatedId: missionId,
+    })
   }
 
   revalidatePath(`/dashboard/missions/${missionId}`)
@@ -55,13 +68,49 @@ export async function updateApplicationStatus(
     redirect('/auth/login')
   }
 
-  const { error } = await supabase
+  const { data: application, error } = await supabase
     .from('applications')
     .update({ status, responded_at: new Date().toISOString() })
     .eq('id', applicationId)
+    .select('candidate_id')
+    .single()
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  const { data: mission } = await supabase.from('missions').select('employer_id, title').eq('id', missionId).maybeSingle()
+
+  if (mission) {
+    await createNotification(supabase, {
+      userId: application.candidate_id,
+      type: status === 'accepted' ? 'application_accepted' : 'application_rejected',
+      title: status === 'accepted' ? 'Candidature acceptée' : 'Candidature refusée',
+      message:
+        status === 'accepted'
+          ? `Votre candidature pour "${mission.title}" a été acceptée.`
+          : `Votre candidature pour "${mission.title}" a été refusée.`,
+      relatedId: missionId,
+    })
+
+    if (status === 'accepted') {
+      const { data: existingConversation } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('mission_id', missionId)
+        .or(
+          `and(user_1_id.eq.${mission.employer_id},user_2_id.eq.${application.candidate_id}),and(user_1_id.eq.${application.candidate_id},user_2_id.eq.${mission.employer_id})`
+        )
+        .maybeSingle()
+
+      if (!existingConversation) {
+        await supabase.from('conversations').insert({
+          mission_id: missionId,
+          user_1_id: mission.employer_id,
+          user_2_id: application.candidate_id,
+        })
+      }
+    }
   }
 
   revalidatePath(`/dashboard/missions/${missionId}`)

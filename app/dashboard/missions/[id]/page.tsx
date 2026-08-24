@@ -5,6 +5,7 @@ import ApplicationsList from '@/components/dashboard/ApplicationsList'
 import {
   getApplicationForMissionAndCandidate,
   getApplicationsForMission,
+  getCandidateProfilesByUserIds,
   getCategories,
   getCurrentUser,
   getMissionById,
@@ -50,8 +51,12 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
   }
 
   const applications = isOwner ? await getApplicationsForMission(mission.id) : []
-  const candidateProfiles = isOwner ? await getProfilesByIds(applications.map((a) => a.candidate_id)) : []
+  const candidateIds = applications.map((a) => a.candidate_id)
+  const [candidateProfiles, candidateExtendedProfiles] = isOwner
+    ? await Promise.all([getProfilesByIds(candidateIds), getCandidateProfilesByUserIds(candidateIds)])
+    : [[], []]
   const candidateNameById = new Map(candidateProfiles.map((p) => [p.id, p.full_name ?? p.email]))
+  const candidateProfileById = new Map(candidateExtendedProfiles.map((p) => [p.user_id, p]))
 
   const categoryName = categories.find((category) => category.id === mission.category_id)?.name
 
@@ -96,7 +101,12 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
       {isOwner && (
         <div className="mt-10">
           <h2 className="text-lg font-semibold text-gray-900">Candidatures reçues</h2>
-          <ApplicationsList applications={applications} missionId={mission.id} candidateNameById={candidateNameById} />
+          <ApplicationsList
+            applications={applications}
+            missionId={mission.id}
+            candidateNameById={candidateNameById}
+            candidateProfileById={candidateProfileById}
+          />
         </div>
       )}
 

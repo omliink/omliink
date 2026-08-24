@@ -30,6 +30,8 @@ export async function createMission(
   const description = String(formData.get('description') ?? '').trim()
   const categoryId = String(formData.get('category_id') ?? '')
   const locationAddress = String(formData.get('location_address') ?? '').trim()
+  const locationLatRaw = formData.get('location_lat')
+  const locationLngRaw = formData.get('location_lng')
   const missionDate = String(formData.get('mission_date') ?? '')
   const missionTimeStart = String(formData.get('mission_time_start') ?? '')
   const missionTimeEnd = String(formData.get('mission_time_end') ?? '')
@@ -51,8 +53,8 @@ export async function createMission(
       title,
       description: description || null,
       location_address: locationAddress || null,
-      location_lat: null,
-      location_lng: null,
+      location_lat: locationLatRaw ? Number(locationLatRaw) : null,
+      location_lng: locationLngRaw ? Number(locationLngRaw) : null,
       status,
       mission_date: missionDate || null,
       mission_time_start: missionTimeStart || null,
