@@ -1,279 +1,497 @@
 // Auto-generated Database Types for OMLIINK
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
+// --- profiles ---
+type ProfilesRow = {
+  id: string
+  email: string
+  full_name: string | null
+  phone: string | null
+  avatar_url: string | null
+  is_verified: boolean
+  verification_type: string | null
+  is_employer: boolean
+  is_candidate: boolean
+  account_status: string
+  created_at: string
+  updated_at: string
+}
+type ProfilesInsert = {
+  id: string
+  email: string
+  full_name?: string | null
+  phone?: string | null
+  avatar_url?: string | null
+  is_verified?: boolean
+  verification_type?: string | null
+  is_employer?: boolean
+  is_candidate?: boolean
+  account_status?: string
+  created_at?: string
+  updated_at?: string
+}
+type ProfilesUpdate = Partial<ProfilesInsert>
+
+// --- candidate_profiles ---
+type CandidateProfilesRow = {
+  id: string
+  user_id: string
+  bio: string | null
+  years_experience: number | null
+  skills: string[] | null
+  languages: string[] | null
+  hourly_rate: number | null
+  availability_status: string
+  rating: number
+  total_missions_completed: number
+  response_rate: number
+  no_show_count: number
+  created_at: string
+  updated_at: string
+}
+type CandidateProfilesInsert = {
+  id?: string
+  user_id: string
+  bio?: string | null
+  years_experience?: number | null
+  skills?: string[] | null
+  languages?: string[] | null
+  hourly_rate?: number | null
+  availability_status?: string
+  rating?: number
+  total_missions_completed?: number
+  response_rate?: number
+  no_show_count?: number
+  created_at?: string
+  updated_at?: string
+}
+type CandidateProfilesUpdate = Partial<CandidateProfilesInsert>
+
+// --- employer_profiles ---
+type EmployerProfilesRow = {
+  id: string
+  user_id: string
+  company_name: string | null
+  bio: string | null
+  total_missions_posted: number
+  total_spent: number
+  rating: number
+  payment_verified: boolean
+  stripe_customer_id: string | null
+  created_at: string
+  updated_at: string
+}
+type EmployerProfilesInsert = {
+  id?: string
+  user_id: string
+  company_name?: string | null
+  bio?: string | null
+  total_missions_posted?: number
+  total_spent?: number
+  rating?: number
+  payment_verified?: boolean
+  stripe_customer_id?: string | null
+  created_at?: string
+  updated_at?: string
+}
+type EmployerProfilesUpdate = Partial<EmployerProfilesInsert>
+
+// --- service_categories ---
+type ServiceCategoriesRow = {
+  id: string
+  name: string
+  slug: string
+  description: string | null
+  icon_url: string | null
+  sort_order: number | null
+  created_at: string
+}
+type ServiceCategoriesInsert = {
+  id?: string
+  name: string
+  slug: string
+  description?: string | null
+  icon_url?: string | null
+  sort_order?: number | null
+  created_at?: string
+}
+type ServiceCategoriesUpdate = Partial<ServiceCategoriesInsert>
+
+// --- missions ---
+type MissionsRow = {
+  id: string
+  employer_id: string
+  category_id: string
+  title: string
+  description: string | null
+  location_address: string | null
+  location_lat: number | null
+  location_lng: number | null
+  status: string
+  mission_date: string | null
+  mission_time_start: string | null
+  mission_time_end: string | null
+  estimated_duration_hours: number | null
+  budget: number | null
+  urssaf_declared: boolean
+  visio_required: boolean
+  visio_completed: boolean
+  max_candidates: number
+  created_at: string
+  updated_at: string
+}
+type MissionsInsert = {
+  id?: string
+  employer_id: string
+  category_id: string
+  title: string
+  description?: string | null
+  location_address?: string | null
+  location_lat?: number | null
+  location_lng?: number | null
+  status?: string
+  mission_date?: string | null
+  mission_time_start?: string | null
+  mission_time_end?: string | null
+  estimated_duration_hours?: number | null
+  budget?: number | null
+  urssaf_declared?: boolean
+  visio_required?: boolean
+  visio_completed?: boolean
+  max_candidates?: number
+  created_at?: string
+  updated_at?: string
+}
+type MissionsUpdate = Partial<MissionsInsert>
+
+// --- visio_meetings ---
+type VisioMeetingsRow = {
+  id: string
+  mission_id: string
+  employer_id: string
+  candidate_id: string
+  room_name: string
+  livekit_token_employer: string | null
+  livekit_token_candidate: string | null
+  status: string
+  proposed_date: string | null
+  scheduled_date: string | null
+  started_at: string | null
+  ended_at: string | null
+  duration_minutes: number | null
+  recording_url: string | null
+  recording_consent_employer: boolean
+  recording_consent_candidate: boolean
+  reschedule_count: number
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+type VisioMeetingsInsert = {
+  id?: string
+  mission_id: string
+  employer_id: string
+  candidate_id: string
+  room_name: string
+  livekit_token_employer?: string | null
+  livekit_token_candidate?: string | null
+  status?: string
+  proposed_date?: string | null
+  scheduled_date?: string | null
+  started_at?: string | null
+  ended_at?: string | null
+  duration_minutes?: number | null
+  recording_url?: string | null
+  recording_consent_employer?: boolean
+  recording_consent_candidate?: boolean
+  reschedule_count?: number
+  notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+type VisioMeetingsUpdate = Partial<VisioMeetingsInsert>
+
+// --- applications ---
+type ApplicationsRow = {
+  id: string
+  mission_id: string
+  candidate_id: string
+  status: string
+  cover_letter: string | null
+  proposed_rate: number | null
+  applied_at: string
+  viewed_at: string | null
+  responded_at: string | null
+  updated_at: string
+}
+type ApplicationsInsert = {
+  id?: string
+  mission_id: string
+  candidate_id: string
+  status?: string
+  cover_letter?: string | null
+  proposed_rate?: number | null
+  applied_at?: string
+  viewed_at?: string | null
+  responded_at?: string | null
+  updated_at?: string
+}
+type ApplicationsUpdate = Partial<ApplicationsInsert>
+
+// --- contracts ---
+type ContractsRow = {
+  id: string
+  mission_id: string
+  candidate_id: string
+  employer_id: string
+  status: string
+  total_amount: number | null
+  payment_status: string
+  signed_date: string | null
+  created_at: string
+  updated_at: string
+}
+type ContractsInsert = {
+  id?: string
+  mission_id: string
+  candidate_id: string
+  employer_id: string
+  status?: string
+  total_amount?: number | null
+  payment_status?: string
+  signed_date?: string | null
+  created_at?: string
+  updated_at?: string
+}
+type ContractsUpdate = Partial<ContractsInsert>
+
+// --- payments ---
+type PaymentsRow = {
+  id: string
+  mission_id: string
+  candidate_id: string
+  employer_id: string
+  amount: number
+  payment_method: string | null
+  stripe_payment_intent_id: string | null
+  status: string
+  fee_amount: number | null
+  created_at: string
+  updated_at: string
+}
+type PaymentsInsert = {
+  id?: string
+  mission_id: string
+  candidate_id: string
+  employer_id: string
+  amount: number
+  payment_method?: string | null
+  stripe_payment_intent_id?: string | null
+  status?: string
+  fee_amount?: number | null
+  created_at?: string
+  updated_at?: string
+}
+type PaymentsUpdate = Partial<PaymentsInsert>
+
+// --- reviews ---
+type ReviewsRow = {
+  id: string
+  mission_id: string
+  from_user_id: string
+  to_user_id: string
+  rating: number
+  comment: string | null
+  is_anonymous: boolean
+  created_at: string
+  updated_at: string
+}
+type ReviewsInsert = {
+  id?: string
+  mission_id: string
+  from_user_id: string
+  to_user_id: string
+  rating: number
+  comment?: string | null
+  is_anonymous?: boolean
+  created_at?: string
+  updated_at?: string
+}
+type ReviewsUpdate = Partial<ReviewsInsert>
+
+// --- conversations ---
+type ConversationsRow = {
+  id: string
+  mission_id: string | null
+  user_1_id: string
+  user_2_id: string
+  last_message_at: string | null
+  created_at: string
+  updated_at: string
+}
+type ConversationsInsert = {
+  id?: string
+  mission_id?: string | null
+  user_1_id: string
+  user_2_id: string
+  last_message_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+type ConversationsUpdate = Partial<ConversationsInsert>
+
+// --- messages ---
+type MessagesRow = {
+  id: string
+  conversation_id: string
+  sender_id: string
+  content: string
+  is_read: boolean
+  read_at: string | null
+  created_at: string
+}
+type MessagesInsert = {
+  id?: string
+  conversation_id: string
+  sender_id: string
+  content: string
+  is_read?: boolean
+  read_at?: string | null
+  created_at?: string
+}
+type MessagesUpdate = Partial<MessagesInsert>
+
+// --- notifications ---
+type NotificationsRow = {
+  id: string
+  user_id: string
+  type: string | null
+  title: string | null
+  message: string | null
+  related_id: string | null
+  is_read: boolean
+  read_at: string | null
+  created_at: string
+}
+type NotificationsInsert = {
+  id?: string
+  user_id: string
+  type?: string | null
+  title?: string | null
+  message?: string | null
+  related_id?: string | null
+  is_read?: boolean
+  read_at?: string | null
+  created_at?: string
+}
+type NotificationsUpdate = Partial<NotificationsInsert>
+
+// --- documents ---
+type DocumentsRow = {
+  id: string
+  user_id: string
+  type: string | null
+  file_url: string | null
+  file_name: string | null
+  verification_status: string
+  uploaded_at: string
+  verified_at: string | null
+  created_at: string
+}
+type DocumentsInsert = {
+  id?: string
+  user_id: string
+  type?: string | null
+  file_url?: string | null
+  file_name?: string | null
+  verification_status?: string
+  uploaded_at?: string
+  verified_at?: string | null
+  created_at?: string
+}
+type DocumentsUpdate = Partial<DocumentsInsert>
+
+// --- reports ---
+type ReportsRow = {
+  id: string
+  reported_user_id: string
+  reporter_user_id: string
+  mission_id: string | null
+  reason: string | null
+  description: string | null
+  status: string
+  admin_notes: string | null
+  created_at: string
+  updated_at: string
+}
+type ReportsInsert = {
+  id?: string
+  reported_user_id: string
+  reporter_user_id: string
+  mission_id?: string | null
+  reason?: string | null
+  description?: string | null
+  status?: string
+  admin_notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+type ReportsUpdate = Partial<ReportsInsert>
 
 export interface Database {
+  __InternalSupabase: {
+    PostgrestVersion: '12'
+  }
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          id: string
-          email: string
-          full_name: string | null
-          phone: string | null
-          avatar_url: string | null
-          is_verified: boolean
-          verification_type: string | null
-          is_employer: boolean
-          is_candidate: boolean
-          account_status: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['profiles']['Insert']>
-      }
+      profiles: { Row: ProfilesRow; Insert: ProfilesInsert; Update: ProfilesUpdate; Relationships: [] }
       candidate_profiles: {
-        Row: {
-          id: string
-          user_id: string
-          bio: string | null
-          years_experience: number | null
-          skills: string[] | null
-          languages: string[] | null
-          hourly_rate: number | null
-          availability_status: string
-          rating: number
-          total_missions_completed: number
-          response_rate: number
-          no_show_count: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['candidate_profiles']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['candidate_profiles']['Insert']>
+        Row: CandidateProfilesRow
+        Insert: CandidateProfilesInsert
+        Update: CandidateProfilesUpdate
+        Relationships: []
       }
       employer_profiles: {
-        Row: {
-          id: string
-          user_id: string
-          company_name: string | null
-          bio: string | null
-          total_missions_posted: number
-          total_spent: number
-          rating: number
-          payment_verified: boolean
-          stripe_customer_id: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['employer_profiles']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['employer_profiles']['Insert']>
+        Row: EmployerProfilesRow
+        Insert: EmployerProfilesInsert
+        Update: EmployerProfilesUpdate
+        Relationships: []
       }
       service_categories: {
-        Row: {
-          id: string
-          name: string
-          slug: string
-          description: string | null
-          icon_url: string | null
-          sort_order: number | null
-          created_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['service_categories']['Row'], 'id' | 'created_at'>
-        Update: Partial<Database['public']['Tables']['service_categories']['Insert']>
+        Row: ServiceCategoriesRow
+        Insert: ServiceCategoriesInsert
+        Update: ServiceCategoriesUpdate
+        Relationships: []
       }
-      missions: {
-        Row: {
-          id: string
-          employer_id: string
-          category_id: string
-          title: string
-          description: string | null
-          location_address: string | null
-          location_lat: number | null
-          location_lng: number | null
-          status: string
-          mission_date: string | null
-          mission_time_start: string | null
-          mission_time_end: string | null
-          estimated_duration_hours: number | null
-          budget: number | null
-          urssaf_declared: boolean
-          visio_required: boolean
-          visio_completed: boolean
-          max_candidates: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['missions']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['missions']['Insert']>
-      }
+      missions: { Row: MissionsRow; Insert: MissionsInsert; Update: MissionsUpdate; Relationships: [] }
       visio_meetings: {
-        Row: {
-          id: string
-          mission_id: string
-          employer_id: string
-          candidate_id: string
-          room_name: string
-          livekit_token_employer: string | null
-          livekit_token_candidate: string | null
-          status: string
-          proposed_date: string | null
-          scheduled_date: string | null
-          started_at: string | null
-          ended_at: string | null
-          duration_minutes: number | null
-          recording_url: string | null
-          recording_consent_employer: boolean
-          recording_consent_candidate: boolean
-          reschedule_count: number
-          notes: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['visio_meetings']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['visio_meetings']['Insert']>
+        Row: VisioMeetingsRow
+        Insert: VisioMeetingsInsert
+        Update: VisioMeetingsUpdate
+        Relationships: []
       }
-      applications: {
-        Row: {
-          id: string
-          mission_id: string
-          candidate_id: string
-          status: string
-          cover_letter: string | null
-          proposed_rate: number | null
-          applied_at: string
-          viewed_at: string | null
-          responded_at: string | null
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['applications']['Row'], 'id' | 'applied_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['applications']['Insert']>
-      }
-      contracts: {
-        Row: {
-          id: string
-          mission_id: string
-          candidate_id: string
-          employer_id: string
-          status: string
-          total_amount: number | null
-          payment_status: string
-          signed_date: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['contracts']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['contracts']['Insert']>
-      }
-      payments: {
-        Row: {
-          id: string
-          mission_id: string
-          candidate_id: string
-          employer_id: string
-          amount: number
-          payment_method: string | null
-          stripe_payment_intent_id: string | null
-          status: string
-          fee_amount: number | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['payments']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['payments']['Insert']>
-      }
-      reviews: {
-        Row: {
-          id: string
-          mission_id: string
-          from_user_id: string
-          to_user_id: string
-          rating: number
-          comment: string | null
-          is_anonymous: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['reviews']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['reviews']['Insert']>
-      }
+      applications: { Row: ApplicationsRow; Insert: ApplicationsInsert; Update: ApplicationsUpdate; Relationships: [] }
+      contracts: { Row: ContractsRow; Insert: ContractsInsert; Update: ContractsUpdate; Relationships: [] }
+      payments: { Row: PaymentsRow; Insert: PaymentsInsert; Update: PaymentsUpdate; Relationships: [] }
+      reviews: { Row: ReviewsRow; Insert: ReviewsInsert; Update: ReviewsUpdate; Relationships: [] }
       conversations: {
-        Row: {
-          id: string
-          mission_id: string | null
-          user_1_id: string
-          user_2_id: string
-          last_message_at: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['conversations']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['conversations']['Insert']>
+        Row: ConversationsRow
+        Insert: ConversationsInsert
+        Update: ConversationsUpdate
+        Relationships: []
       }
-      messages: {
-        Row: {
-          id: string
-          conversation_id: string
-          sender_id: string
-          content: string
-          is_read: boolean
-          read_at: string | null
-          created_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['messages']['Row'], 'id' | 'created_at'>
-        Update: Partial<Database['public']['Tables']['messages']['Insert']>
-      }
+      messages: { Row: MessagesRow; Insert: MessagesInsert; Update: MessagesUpdate; Relationships: [] }
       notifications: {
-        Row: {
-          id: string
-          user_id: string
-          type: string | null
-          title: string | null
-          message: string | null
-          related_id: string | null
-          is_read: boolean
-          read_at: string | null
-          created_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['notifications']['Row'], 'id' | 'created_at'>
-        Update: Partial<Database['public']['Tables']['notifications']['Insert']>
+        Row: NotificationsRow
+        Insert: NotificationsInsert
+        Update: NotificationsUpdate
+        Relationships: []
       }
-      documents: {
-        Row: {
-          id: string
-          user_id: string
-          type: string | null
-          file_url: string | null
-          file_name: string | null
-          verification_status: string
-          uploaded_at: string
-          verified_at: string | null
-          created_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['documents']['Row'], 'id' | 'created_at'>
-        Update: Partial<Database['public']['Tables']['documents']['Insert']>
-      }
-      reports: {
-        Row: {
-          id: string
-          reported_user_id: string
-          reporter_user_id: string
-          mission_id: string | null
-          reason: string | null
-          description: string | null
-          status: string
-          admin_notes: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['reports']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['reports']['Insert']>
-      }
-      [key: string]: any
+      documents: { Row: DocumentsRow; Insert: DocumentsInsert; Update: DocumentsUpdate; Relationships: [] }
+      reports: { Row: ReportsRow; Insert: ReportsInsert; Update: ReportsUpdate; Relationships: [] }
     }
     Views: {
-      [key: string]: {
-        Row: {
-          [key: string]: any
-        }
-      }
+      [key: string]: never
     }
     Functions: {
       [key: string]: {
