@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { updateCandidateProfile, type ProfileFormState } from '@/lib/actions/profile'
+import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 import type { Database } from '@/types/database.types'
 
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
@@ -24,6 +25,8 @@ const EMPLOYMENT_STATUS_OPTIONS = [
     hint: "Vous facturez vos prestations comme travailleur indépendant, l'employeur devient votre client. Paiement sécurisé via Stripe Connect, commission OMLIINK de 10%.",
   },
 ] as const
+
+const RADIUS_OPTIONS_KM = [5, 10, 20, 30, 50]
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -68,6 +71,43 @@ export default function CandidateProfileForm({ profile }: { profile: CandidatePr
           ))}
         </div>
         <input type="hidden" name="employment_status" value={employmentStatus} />
+      </div>
+
+      <div>
+        <AddressAutocomplete
+          id="location_address"
+          name="location_address"
+          latName="location_lat"
+          lngName="location_lng"
+          label="Adresse de référence"
+          defaultValue={
+            profile.location_lat != null && profile.location_lng != null ? 'Position enregistrée' : undefined
+          }
+          defaultLat={profile.location_lat}
+          defaultLng={profile.location_lng}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="radius_km" className="mb-1 block text-sm font-medium text-gray-700">
+          Rayon de déplacement accepté
+        </label>
+        <select
+          id="radius_km"
+          name="radius_km"
+          defaultValue={profile.radius_km ?? 20}
+          aria-describedby="radius-hint"
+          className={inputClass}
+        >
+          {RADIUS_OPTIONS_KM.map((km) => (
+            <option key={km} value={km}>
+              {km} km
+            </option>
+          ))}
+        </select>
+        <p id="radius-hint" className="mt-1 text-xs text-gray-500">
+          Utilisé pour trier et filtrer les missions disponibles par distance.
+        </p>
       </div>
 
       <div>

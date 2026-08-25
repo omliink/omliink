@@ -4,6 +4,7 @@ import ApplyForm from '@/components/dashboard/ApplyForm'
 import ApplicationsList from '@/components/dashboard/ApplicationsList'
 import VisioSection from '@/components/dashboard/VisioSection'
 import ContractSection from '@/components/dashboard/ContractSection'
+import { haversineDistanceKm } from '@/lib/geo'
 import {
   getApplicationForMissionAndCandidate,
   getApplicationsForMission,
@@ -61,6 +62,20 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
     : [[], []]
   const candidateNameById = new Map(candidateProfiles.map((p) => [p.id, p.full_name ?? p.email]))
   const candidateProfileById = new Map(candidateExtendedProfiles.map((p) => [p.user_id, p]))
+
+  const missionLat = mission.location_lat
+  const missionLng = mission.location_lng
+  const distanceByCandidateId = new Map<string, number>()
+  if (missionLat != null && missionLng != null) {
+    for (const candidateProfile of candidateExtendedProfiles) {
+      if (candidateProfile.location_lat != null && candidateProfile.location_lng != null) {
+        distanceByCandidateId.set(
+          candidateProfile.user_id,
+          haversineDistanceKm(missionLat, missionLng, candidateProfile.location_lat, candidateProfile.location_lng)
+        )
+      }
+    }
+  }
 
   const categoryName = categories.find((category) => category.id === mission.category_id)?.name
 
@@ -121,6 +136,7 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             missionId={mission.id}
             candidateNameById={candidateNameById}
             candidateProfileById={candidateProfileById}
+            distanceByCandidateId={distanceByCandidateId}
           />
         </div>
       )}

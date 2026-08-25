@@ -9,6 +9,11 @@ interface MissionCardProps {
   variant: 'employer' | 'candidate'
   categoryName?: string | null
   applicationsCount?: number
+  distanceKm?: number | null
+}
+
+function formatDistance(value: number) {
+  return `${value.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`
 }
 
 function formatDate(value: string | null) {
@@ -21,7 +26,7 @@ function formatBudget(value: number | null) {
   return `${value.toLocaleString('fr-FR')} €`
 }
 
-export default function MissionCard({ mission, variant, categoryName, applicationsCount }: MissionCardProps) {
+export default function MissionCard({ mission, variant, categoryName, applicationsCount, distanceKm }: MissionCardProps) {
   return (
     <Link
       href={`/dashboard/missions/${mission.id}`}
@@ -41,6 +46,9 @@ export default function MissionCard({ mission, variant, categoryName, applicatio
         {variant === 'candidate' && mission.location_address && <span>{mission.location_address}</span>}
         <span>{formatDate(mission.mission_date)}</span>
         <span>{formatBudget(mission.budget)}</span>
+        {variant === 'candidate' && distanceKm != null && (
+          <span className="font-medium text-indigo-600">{formatDistance(distanceKm)}</span>
+        )}
       </div>
 
       <div className="mt-4 flex items-center justify-between">

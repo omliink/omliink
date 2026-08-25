@@ -43,6 +43,9 @@ type CandidateProfilesRow = {
   hourly_rate: number | null
   availability_status: string
   employment_status: string
+  location_lat: number | null
+  location_lng: number | null
+  radius_km: number
   rating: number
   total_missions_completed: number
   response_rate: number
@@ -60,6 +63,9 @@ type CandidateProfilesInsert = {
   hourly_rate?: number | null
   availability_status?: string
   employment_status?: string
+  location_lat?: number | null
+  location_lng?: number | null
+  radius_km?: number
   rating?: number
   total_missions_completed?: number
   response_rate?: number

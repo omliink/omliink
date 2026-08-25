@@ -12,6 +12,11 @@ interface ApplicationsListProps {
   missionId: string
   candidateNameById: Map<string, string>
   candidateProfileById: Map<string, CandidateProfile>
+  distanceByCandidateId?: Map<string, number>
+}
+
+function formatDistance(value: number) {
+  return `${value.toLocaleString('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} km`
 }
 
 export default function ApplicationsList({
@@ -19,6 +24,7 @@ export default function ApplicationsList({
   missionId,
   candidateNameById,
   candidateProfileById,
+  distanceByCandidateId,
 }: ApplicationsListProps) {
   if (applications.length === 0) {
     return (
@@ -33,11 +39,14 @@ export default function ApplicationsList({
 
   return (
     <ul className="mt-4 divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-100 bg-white">
-      {applications.map((application) => (
+      {applications.map((application) => {
+        const distanceKm = distanceByCandidateId?.get(application.candidate_id)
+        return (
         <li key={application.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-sm font-medium text-gray-900">
               {candidateNameById.get(application.candidate_id) ?? 'Candidat'}
+              {distanceKm != null && <span className="font-normal text-gray-500"> · {formatDistance(distanceKm)}</span>}
             </p>
             {application.cover_letter && <p className="mt-1 text-sm text-gray-600">{application.cover_letter}</p>}
             <p className="mt-1 text-xs text-gray-500">
@@ -52,7 +61,8 @@ export default function ApplicationsList({
             <ApplicationActions applicationId={application.id} missionId={missionId} status={application.status} />
           </div>
         </li>
-      ))}
+        )
+      })}
     </ul>
   )
 }

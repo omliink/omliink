@@ -4,7 +4,7 @@ import EmployerDashboard from '@/components/dashboard/EmployerDashboard'
 import CandidateDashboard from '@/components/dashboard/CandidateDashboard'
 
 interface DashboardPageProps {
-  searchParams: Promise<{ category?: string; created?: string }>
+  searchParams: Promise<{ category?: string; created?: string; showAll?: string }>
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
@@ -38,7 +38,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <div className="flex flex-col gap-12">
         {profile.is_employer && <EmployerDashboard employerId={user.id} fullName={fullName} />}
         {profile.is_candidate && (
-          <CandidateDashboard candidateId={user.id} fullName={fullName} categoryFilter={params.category} />
+          <CandidateDashboard
+            candidateId={user.id}
+            fullName={fullName}
+            categoryFilter={params.category}
+            showAllDistance={params.showAll === '1'}
+          />
         )}
       </div>
     </div>

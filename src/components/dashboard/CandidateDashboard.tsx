@@ -1,10 +1,14 @@
+import Link from 'next/link'
 import MissionCard from '@/components/ui/MissionCard'
 import EmptyState from '@/components/ui/EmptyState'
 import StatusBadge from '@/components/ui/StatusBadge'
 import CategoryFilter from './CategoryFilter'
 import ActiveMissionCard from './ActiveMissionCard'
+import DistanceFilterToggle from './DistanceFilterToggle'
+import { haversineDistanceKm } from '@/lib/geo'
 import {
   getCandidateApplications,
+  getCandidateProfile,
   getCategories,
   getMissionsByIds,
   getPublishedMissions,
@@ -15,13 +19,20 @@ interface CandidateDashboardProps {
   candidateId: string
   fullName: string
   categoryFilter?: string
+  showAllDistance?: boolean
 }
 
-export default async function CandidateDashboard({ candidateId, fullName, categoryFilter }: CandidateDashboardProps) {
-  const [allMissions, categories, myApplications] = await Promise.all([
+export default async function CandidateDashboard({
+  candidateId,
+  fullName,
+  categoryFilter,
+  showAllDistance,
+}: CandidateDashboardProps) {
+  const [allMissions, categories, myApplications, candidateProfile] = await Promise.all([
     getPublishedMissions(),
     getCategories(),
     getCandidateApplications(candidateId),
+    getCandidateProfile(candidateId),
   ])
 
   const appliedMissionIds = new Set(myApplications.map((application) => application.mission_id))
@@ -31,6 +42,32 @@ export default async function CandidateDashboard({ candidateId, fullName, catego
   if (categoryFilter) {
     availableMissions = availableMissions.filter((mission) => mission.category_id === categoryFilter)
   }
+
+  const candidateLat = candidateProfile?.location_lat
+  const candidateLng = candidateProfile?.location_lng
+  const hasLocation = candidateLat != null && candidateLng != null
+  const radiusKm = candidateProfile?.radius_km ?? 20
+
+  const availableMissionsWithDistance = availableMissions.map((mission) => ({
+    mission,
+    distanceKm:
+      hasLocation && mission.location_lat != null && mission.location_lng != null
+        ? haversineDistanceKm(candidateLat, candidateLng, mission.location_lat, mission.location_lng)
+        : null,
+  }))
+
+  if (hasLocation) {
+    availableMissionsWithDistance.sort((a, b) => {
+      if (a.distanceKm == null) return 1
+      if (b.distanceKm == null) return -1
+      return a.distanceKm - b.distanceKm
+    })
+  }
+
+  const visibleMissionsWithDistance =
+    hasLocation && !showAllDistance
+      ? availableMissionsWithDistance.filter((entry) => entry.distanceKm == null || entry.distanceKm <= radiusKm)
+      : availableMissionsWithDistance
 
   const appliedMissions = await getMissionsByIds(myApplications.map((application) => application.mission_id))
   const missionById = new Map(appliedMissions.map((mission) => [mission.id, mission]))
@@ -76,10 +113,22 @@ export default async function CandidateDashboard({ candidateId, fullName, catego
       <div>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="text-lg font-semibold text-gray-900">Missions disponibles</h2>
-          <CategoryFilter categories={categories} selected={categoryFilter} />
+          <div className="flex flex-wrap items-center gap-4">
+            {hasLocation && <DistanceFilterToggle radiusKm={radiusKm} showAll={Boolean(showAllDistance)} />}
+            <CategoryFilter categories={categories} selected={categoryFilter} />
+          </div>
         </div>
 
-        {availableMissions.length === 0 ? (
+        {!hasLocation && (
+          <p className="mt-2 text-xs text-gray-500">
+            <Link href="/dashboard/profile" className="text-indigo-600 underline hover:text-indigo-700">
+              Renseignez votre localisation sur votre profil
+            </Link>{' '}
+            pour trier et filtrer les missions par distance.
+          </p>
+        )}
+
+        {visibleMissionsWithDistance.length === 0 ? (
           <div className="mt-4">
             <EmptyState
               title="Aucune mission disponible"
@@ -88,12 +137,13 @@ export default async function CandidateDashboard({ candidateId, fullName, catego
           </div>
         ) : (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {availableMissions.map((mission) => (
+            {visibleMissionsWithDistance.map(({ mission, distanceKm }) => (
               <MissionCard
                 key={mission.id}
                 mission={mission}
                 variant="candidate"
                 categoryName={categoryMap.get(mission.category_id)}
+                distanceKm={distanceKm}
               />
             ))}
           </div>

@@ -3,6 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import type { Database } from '@/types/database.types'
+
+type CandidateProfileUpdate = Database['public']['Tables']['candidate_profiles']['Update']
 
 export interface ProfileFormState {
   error?: string
@@ -41,16 +44,37 @@ export async function updateCandidateProfile(
         .filter(Boolean)
     : []
 
-  const { error } = await supabase
-    .from('candidate_profiles')
-    .update({
-      bio: bio || null,
-      skills: skills.length > 0 ? skills : null,
-      years_experience: yearsExperienceRaw ? Number(yearsExperienceRaw) : null,
-      hourly_rate: hourlyRateRaw ? Number(hourlyRateRaw) : null,
-      employment_status: employmentStatus,
-    })
-    .eq('user_id', user.id)
+  const updatePayload: CandidateProfileUpdate = {
+    bio: bio || null,
+    skills: skills.length > 0 ? skills : null,
+    years_experience: yearsExperienceRaw ? Number(yearsExperienceRaw) : null,
+    hourly_rate: hourlyRateRaw ? Number(hourlyRateRaw) : null,
+    employment_status: employmentStatus,
+  }
+
+  // The address autocomplete only submits valid lat/lng when a suggestion
+  // was actually selected — an empty/unresolved address means "leave the
+  // previously saved location untouched" rather than "clear it".
+  const locationLatRaw = formData.get('location_lat')
+  const locationLngRaw = formData.get('location_lng')
+  if (locationLatRaw && locationLngRaw) {
+    const lat = Number(locationLatRaw)
+    const lng = Number(locationLngRaw)
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      updatePayload.location_lat = lat
+      updatePayload.location_lng = lng
+    }
+  }
+
+  const radiusKmRaw = formData.get('radius_km')
+  if (radiusKmRaw) {
+    const radiusKm = Number(radiusKmRaw)
+    if (!Number.isNaN(radiusKm)) {
+      updatePayload.radius_km = radiusKm
+    }
+  }
+
+  const { error } = await supabase.from('candidate_profiles').update(updatePayload).eq('user_id', user.id)
 
   if (error) {
     return { error: error.message }
