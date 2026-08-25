@@ -97,7 +97,8 @@ CREATE TABLE profiles (
   is_online BOOLEAN DEFAULT FALSE,
   last_seen_at TIMESTAMP,
   
-  -- URSSAF
+  -- URSSAF (réservé — pilote plateforme volontaire depuis avril 2026,
+  -- généralisation 2027 ; hors périmètre actuel, voir CAHIER_DES_CHARGES.md)
   urssaf_account_linked BOOLEAN DEFAULT FALSE,
   urssaf_employer_id TEXT,
   
@@ -177,6 +178,62 @@ CREATE TABLE candidate_profiles (
 CREATE INDEX idx_candidate_profiles_user_id ON candidate_profiles(user_id);
 CREATE INDEX idx_candidate_profiles_verification_level ON candidate_profiles(verification_level);
 ```
+
+> ⚠️ Le schéma réellement déployé (`src/types/database.types.ts`) est plus
+> simple que ce plan d'origine — voir ci-dessous les deux évolutions décidées
+> après recherche du cadre légal français et comparaison avec Yoopies. Le SQL
+> de migration correspondant (à exécuter tel quel dans Supabase) est donné
+> plus bas dans [Migrations](#migrations).
+
+#### Champ ajouté — `employment_status` (à exécuter maintenant)
+
+Un candidat porte un statut légal/fiscal, **sur la table `candidate_profiles`
+existante** (pas de table séparée : les deux statuts partagent la même
+mécanique de candidature/visio/contrat, seul le mode de paiement final
+diffère) :
+
+```sql
+employment_status TEXT NOT NULL DEFAULT 'particulier_employeur'
+-- 'particulier_employeur' : emploi déclaré classique. L'employeur (la
+--   famille) reste l'employeur légal. OMLIINK NE devient PAS l'employeur,
+--   ne gère PAS la déclaration URSSAF à sa place. OMLIINK fournit un
+--   générateur de contrat de travail (déjà implémenté via `contracts`).
+--   Salaire et cotisations restent gérés par l'employeur via le CESU
+--   officiel, en dehors d'OMLIINK — OMLIINK ne touche pas cet argent.
+-- 'auto_entrepreneur' : le candidat facture ses prestations comme
+--   travailleur indépendant, l'employeur devient son client. Paiement via
+--   Stripe Connect (marketplace standard) : OMLIINK encaisse, prend sa
+--   commission (10%), reverse le solde. SEUL cas où OMLIINK gère un flux
+--   de paiement réel.
+```
+
+> ⚠️ Ne pas confondre avec le champ `status` déjà documenté ci-dessus
+> (`'student'`, `'unemployed'`, `'retired'`, …) : celui-ci décrit la
+> situation personnelle du candidat, `employment_status` décrit son statut
+> légal de facturation/paiement. Les deux statuts se recherchent et se
+> candidatent mutuellement de la même façon (un employeur voit tous les
+> candidats des deux statuts, un candidat de n'importe quel statut voit
+> toutes les missions publiées) — `employment_status` n'est affiché que
+> comme information sur le profil et ne détermine que le mode de paiement en
+> fin de cycle (Sprint paiements à venir).
+
+#### Champs futurs — matching géographique (pour plus tard, pas ce sprint)
+
+Pour le sprint de matching géographique à venir (tri/filtre par distance —
+voir [CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md#matching-algorithm)) :
+
+```sql
+location_lat  DOUBLE PRECISION  -- adresse de référence du candidat,
+location_lng  DOUBLE PRECISION  --   via le même autocomplete BAN que missions
+radius_km     INTEGER DEFAULT 20 -- rayon de déplacement accepté (ex: 10/20/30 km)
+```
+
+`missions` a déjà `location_lat`/`location_lng` (Sprint 2). Le calcul de
+distance se fait par **formule haversine** (SQL ou applicatif) — pas besoin
+d'extension PostGIS à ce volume pour le MVP. Deux usages prévus : (1) le
+candidat voit les missions triées/filtrées par distance à sa position, dans
+son rayon d'action ; (2) l'employeur voit, sur chaque candidature reçue, la
+distance entre le candidat et le lieu de la mission.
 
 ---
 
@@ -320,7 +377,8 @@ CREATE TABLE missions (
   max_candidates INTEGER DEFAULT 10,
   auto_match BOOLEAN DEFAULT FALSE,
   
-  -- URSSAF
+  -- URSSAF (champ existant dans le schéma déployé mais non utilisé — hors
+  -- périmètre actuel, voir Statut Candidat & Paiement dans CAHIER_DES_CHARGES.md)
   urssaf_declaration_id TEXT,
   urssaf_declared BOOLEAN DEFAULT FALSE,
   
@@ -1013,6 +1071,36 @@ EXECUTE FUNCTION update_timestamp();
 
 004_create_triggers.sql
   └─ Créer triggers updated_at
+```
+
+### Migration — `employment_status` (à exécuter maintenant)
+
+Basée sur le schéma réellement déployé (`candidate_profiles` existe déjà
+avec `id`, `user_id`, `bio`, `years_experience`, `skills`, `languages`,
+`hourly_rate`, `availability_status`, `rating`, `total_missions_completed`,
+`response_rate`, `no_show_count`).
+
+```sql
+-- supabase/migrations/<timestamp>_candidate_employment_status.sql
+
+alter table public.candidate_profiles
+  add column if not exists employment_status text not null default 'particulier_employeur';
+
+alter table public.candidate_profiles
+  add constraint candidate_profiles_employment_status_check
+  check (employment_status in ('particulier_employeur', 'auto_entrepreneur'));
+```
+
+### Migration — champs de localisation candidat (pour plus tard, sprint matching géographique)
+
+```sql
+-- supabase/migrations/<timestamp>_candidate_location_matching.sql
+-- NE PAS exécuter avant le sprint de matching géographique.
+
+alter table public.candidate_profiles
+  add column if not exists location_lat double precision,
+  add column if not exists location_lng double precision,
+  add column if not exists radius_km integer not null default 20;
 ```
 
 ---

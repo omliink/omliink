@@ -14,7 +14,7 @@
 4. [Modèle Économique](#modèle-économique)
 5. [Système Visio](#système-visio)
 6. [Vérification Candidats](#vérification-candidats)
-7. [Intégration URSSAF](#intégration-urssaf)
+7. [Statut Candidat & Paiement](#statut-candidat--paiement)
 8. [Matching Algorithm](#matching-algorithm)
 9. [Design System](#design-system)
 10. [Contraintes & Règles](#contraintes--règles)
@@ -38,11 +38,19 @@
 ### La Promesse OMLIINK
 
 ```
-✅ 100% Légal & Déclaré          (URSSAF automatique)
-✅ 100% Vérifié                  (Casier judiciaire, KYC, attestation)
-✅ 100% Confiance                (Visio obligatoire avant mission)
-✅ 100% Simple                   (Zéro administratif employeur)
+✅ 100% Légal      (contrat généré automatiquement, paiement sécurisé via
+                     Stripe Connect pour les auto-entrepreneurs, ou
+                     accompagnement vers le CESU officiel pour les
+                     particuliers employeurs)
+✅ 100% Vérifié    (Casier judiciaire, KYC, attestation)
+✅ 100% Confiance  (Visio obligatoire avant mission)
+✅ 100% Simple     (Zéro administratif employeur)
 ```
+
+> Le cadre légal permettant à une plateforme comme OMLIINK d'automatiser
+> elle-même la déclaration URSSAF existe, mais n'est qu'en phase pilote
+> volontaire depuis avril 2026 (généralisation prévue en 2027). Ce n'est donc
+> pas dans le périmètre actuel — voir [Statut Candidat & Paiement](#statut-candidat--paiement).
 
 ---
 
@@ -88,9 +96,12 @@ Supabase (PostgreSQL + Auth + Storage + Realtime)
 Stripe Connect (paiements)
 LiveKit Cloud (visioconférence WebRTC)
 Resend (emails transactionnels)
-Mapbox (géolocalisation)
-URSSAF API (déclarations légales)
+Mapbox / API Adresse (BAN) (géolocalisation)
 ```
+
+> Pas d'intégration URSSAF API dans le périmètre actuel — voir
+> [Statut Candidat & Paiement](#statut-candidat--paiement). Le générateur de
+> contrat de travail (`contracts`) est en revanche déjà implémenté.
 
 ### Infrastructure
 
@@ -107,7 +118,11 @@ Domaine: omliink.fr + SSL
 ### Revenus
 
 **Commission (Principal) — 10%**
-- Côté employeur uniquement
+- Prélevée uniquement sur les missions où le candidat a le statut
+  `auto_entrepreneur` (seul flux où OMLIINK encaisse réellement de l'argent,
+  via Stripe Connect — voir [Statut Candidat & Paiement](#statut-candidat--paiement))
+- Côté employeur (montant facturé, la commission est retenue sur le
+  reversement au candidat)
 - À chaque mission validée
 - Possible réduction partenariats
 
@@ -239,49 +254,68 @@ Coûts: 150€
 
 ---
 
-## 🤝 Intégration URSSAF
+## 🤝 Statut Candidat & Paiement
 
-### Automatisations
+Décision prise après recherche du cadre légal français et comparaison avec
+Yoopies (leader du marché) : un candidat porte un champ `employment_status`
+sur `candidate_profiles` — **une seule table**, pas deux profils séparés. Les
+deux statuts partagent exactement la même mécanique de candidature, de visio
+et de contrat ; seul le mode de paiement final diffère.
 
-```
-✅ Inscription CESU de l'employeur
-✅ Déclaration heures après confirmation
-✅ Calcul charges (patronales + salariales)
-✅ Génération bulletin paie PDF
-✅ Dispatch paiement (net candidat + charges URSSAF)
-✅ Attestation crédit impôt (50% dépenses)
-✅ Récapitulatif fiscal annuel
-```
-
-### Simulateur Temps Réel
+### `particulier_employeur` — emploi déclaré classique
 
 ```
-Tarif horaire:              13,00 €
-Durée:                       3 heures
-Salaire brut:               39,00 €
-Charges patronales:         15,60 €
-Commission OMLIINK:          3,90 € (10%)
-──────────────────────────────────────
-Coût total:                 58,50 €
-Crédit impôt:              -29,25 € (50%)
-Coût réel:                  29,25 €
-Candidat reçoit:            30,42 € net
+✅ L'employeur (la famille) reste l'employeur légal
+❌ OMLIINK ne devient PAS l'employeur
+❌ OMLIINK ne gère PAS la déclaration URSSAF à sa place
+✅ OMLIINK fournit un générateur de contrat de travail (table `contracts`,
+   déjà implémenté)
+✅ Salaire et cotisations gérés par l'employeur via le CESU officiel,
+   entièrement en dehors d'OMLIINK
+❌ OMLIINK ne touche pas cet argent → pas de commission sur ce flux
 ```
 
-### Plafonds & Limites
+### `auto_entrepreneur` — prestation indépendante
 
 ```
-Crédit impôt: 12 000€/an max
-Commission: 10% (variable par partenaire)
-Taux CESU: Variable (via API URSSAF)
-Seuil déclaration: À partir 1ère heure
+✅ Le candidat facture ses prestations comme travailleur indépendant
+✅ L'employeur devient son client
+✅ Paiement via Stripe Connect (marketplace standard) :
+   OMLIINK encaisse → prend sa commission (10%) → reverse le solde
+✅ SEUL cas où OMLIINK gère un flux de paiement réel
 ```
+
+### Recherche & visibilité : statut neutre
+
+```
+✅ Un employeur voit tous les candidats (des deux statuts) sur ses missions
+✅ Un candidat, quel que soit son statut, voit toutes les missions publiées
+✅ Le statut n'est affiché que comme information sur le profil
+✅ Il détermine uniquement le mode de paiement en fin de cycle (Sprint futur)
+```
+
+### Roadmap : automatisation URSSAF
+
+Le cadre légal permettant à une plateforme de déclarer elle-même les heures
+à l'URSSAF pour le compte de l'employeur existe, mais n'est qu'en phase
+pilote volontaire depuis avril 2026 — généralisation prévue en 2027. OMLIINK
+pourra évoluer vers ce modèle plus tard ; c'est **hors périmètre actuel**.
 
 ---
 
 ## 🧠 Matching Algorithm
 
-### Formule Complète
+> **Scope du prochain sprint (matching géographique) :** tri/filtre simple
+> des missions par distance, calculée par formule haversine (SQL ou
+> applicatif — pas besoin de PostGIS à ce volume). Pas de score
+> multi-critères pour l'instant. Voir
+> [ARCHITECTURE_DATABASE.md](./ARCHITECTURE_DATABASE.md) pour les champs
+> `location_lat`/`location_lng`/`radius_km` à ajouter à `candidate_profiles`.
+> Le score complet ci-dessous reste la **vision cible à terme**, une fois
+> assez de données réelles d'usage accumulées (disponibilité, réputation,
+> fiabilité, etc.) pour le rendre pertinent.
+
+### Formule Complète (vision cible — pas encore implémentée)
 
 ```
 Score =
@@ -367,7 +401,10 @@ Monospace: Geist Mono
 ### Légales
 
 ```
-✅ 100% URSSAF déclaré (zéro travail noir)
+✅ Cadre légal respecté selon le statut du candidat : contrat de travail
+   généré automatiquement (les deux statuts), paiement via le CESU officiel
+   hors OMLIINK (particulier employeur) ou via Stripe Connect (auto-
+   entrepreneur) — voir Statut Candidat & Paiement
 ✅ KYC obligatoire (Know Your Customer)
 ✅ Casier judiciaire (certains services)
 ✅ Conformité RGPD (données utilisateurs)
@@ -401,10 +438,10 @@ Monospace: Geist Mono
 | Aspect | OMLIINK | Leboncoin | TaskRabbit | Yoopies |
 |--------|---------|-----------|-----------|---------|
 | **Visio intégrée** | ✅ Obligatoire | ❌ Non | ✅ Optionnel | ❌ Non |
-| **URSSAF auto** | ✅ API | ❌ Non | ❌ Non | ✅ Partiel |
+| **Paiement légal** | ✅ Contrat auto + Stripe Connect (auto-entrepreneur) ou CESU (particulier employeur) | ❌ Non | ❌ Non | ✅ Partiel |
 | **Particuliers only** | ✅ Strict | ❌ Mélangé | ❌ Pros acceptés | ❌ Pros |
 | **Vérification** | ✅ Stricte | ❌ Minimal | ✅ KYC | ✅ KYC |
-| **Matching algo** | ✅ IA | ❌ Non | ❌ Simple | ❌ Simple |
+| **Matching géo** | 🔜 Distance (à venir) | ❌ Non | ❌ Simple | ❌ Simple |
 | **Marché** | 🇫🇷 France | 🇫🇷 France | 🌍 Global | 🇫🇷 France |
 
 ---
@@ -440,8 +477,8 @@ Plateforme:
 - [ ] Database production validée
 - [ ] Migrations Supabase appliquées
 - [ ] Edge Functions déployées
-- [ ] Stripe production live
-- [ ] URSSAF production testée
+- [ ] Stripe Connect production live (statut auto-entrepreneur)
+- [ ] Générateur de contrat testé pour les deux statuts candidat
 - [ ] LiveKit production testée
 - [ ] Emails transactionnels testés
 - [ ] Mapbox production configuré

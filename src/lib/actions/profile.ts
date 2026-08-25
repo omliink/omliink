@@ -9,6 +9,8 @@ export interface ProfileFormState {
   success?: boolean
 }
 
+const EMPLOYMENT_STATUSES = ['particulier_employeur', 'auto_entrepreneur']
+
 export async function updateCandidateProfile(
   _prevState: ProfileFormState,
   formData: FormData
@@ -26,6 +28,11 @@ export async function updateCandidateProfile(
   const skillsRaw = String(formData.get('skills') ?? '').trim()
   const yearsExperienceRaw = formData.get('years_experience')
   const hourlyRateRaw = formData.get('hourly_rate')
+  const employmentStatus = String(formData.get('employment_status') ?? '')
+
+  if (!EMPLOYMENT_STATUSES.includes(employmentStatus)) {
+    return { error: 'Merci de choisir un statut' }
+  }
 
   const skills = skillsRaw
     ? skillsRaw
@@ -41,6 +48,7 @@ export async function updateCandidateProfile(
       skills: skills.length > 0 ? skills : null,
       years_experience: yearsExperienceRaw ? Number(yearsExperienceRaw) : null,
       hourly_rate: hourlyRateRaw ? Number(hourlyRateRaw) : null,
+      employment_status: employmentStatus,
     })
     .eq('user_id', user.id)
 

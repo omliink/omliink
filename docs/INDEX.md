@@ -29,8 +29,8 @@ Lire en DEUXIÈME (30 min)
 ├─ Modèle économique
 ├─ Système visio
 ├─ Vérification candidats
-├─ Intégration URSSAF
-├─ Matching algorithm
+├─ Statut candidat & paiement
+├─ Matching algorithm (géographique, scope MVP)
 └─ Design system
 ```
 **Placement:** `/docs/CAHIER_DES_CHARGES.md` ou `/CAHIER_DES_CHARGES.md`  

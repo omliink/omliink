@@ -42,6 +42,7 @@ type CandidateProfilesRow = {
   languages: string[] | null
   hourly_rate: number | null
   availability_status: string
+  employment_status: string
   rating: number
   total_missions_completed: number
   response_rate: number
@@ -58,6 +59,7 @@ type CandidateProfilesInsert = {
   languages?: string[] | null
   hourly_rate?: number | null
   availability_status?: string
+  employment_status?: string
   rating?: number
   total_missions_completed?: number
   response_rate?: number

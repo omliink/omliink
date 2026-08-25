@@ -245,13 +245,22 @@ Alternatives:
 ✅ Contexte géographique
 ```
 
-#### Use Case #3: Matching Algorithm
+#### Use Case #3: Matching Géographique
+
+> Scope Sprint 7 (MVP) : tri/filtre par distance simple (formule haversine),
+> pas le score pondéré multi-critères. Voir
+> [CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md#matching-algorithm) pour
+> le détail scope vs vision cible, et
+> [ARCHITECTURE_DATABASE.md](./ARCHITECTURE_DATABASE.md) pour les champs
+> `location_lat`/`location_lng`/`radius_km` à ajouter à `candidate_profiles`.
+
 ```
-Algo Matching utilise:
-  - Distance = distance entre candidat lat/lng 
-              et mission lat/lng
-  - Score distance = [100pts si <2km, 80 si 2-5km, ...]
-  - Mapbox Directions API (optionnel) = calculer temps trajet
+Matching géographique (scope MVP) utilise:
+  - Distance = distance entre candidat lat/lng
+              et mission lat/lng (formule haversine)
+  - Tri/filtre des missions par distance, dans le radius_km du candidat
+  - Score pondéré multi-critères (distance/dispo/réputation/...) = vision
+    cible à terme, pas ce sprint
 ```
 
 **Pourquoi c'est crucial?**
@@ -283,9 +292,11 @@ Algo Matching utilise:
 
 **Sprint 7 (Semaine 6):**
 ```
-- [ ] Matching algorithm
-  - [ ] Distance calculation (Mapbox)
-  - [ ] Filtrage géographique
+- [ ] Matching géographique (distance uniquement — scope MVP)
+  - [ ] Migration candidate_profiles: location_lat/location_lng/radius_km
+  - [ ] Distance calculation (formule haversine)
+  - [ ] Tri/filtrage missions par distance (candidat)
+  - [ ] Distance affichée sur les candidatures (employeur)
 ```
 
 **Timeline Complet:**
@@ -445,8 +456,8 @@ Missions Pages (Sprints 5-6):
   ├─ Mapbox: Distance calculation
   └─ LiveKit: ❌
 
-Matching (Sprint 7):
-  ├─ Mapbox: Distance en algo
+Matching géographique (Sprint 7, scope MVP = distance uniquement):
+  ├─ Mapbox/BAN: Distance (haversine)
   └─ LiveKit: ❌
 
 Chat (Sprint 8):

@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { updateCandidateProfile, type ProfileFormState } from '@/lib/actions/profile'
 import type { Database } from '@/types/database.types'
@@ -11,6 +11,19 @@ const initialState: ProfileFormState = {}
 
 const inputClass =
   'block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500'
+
+const EMPLOYMENT_STATUS_OPTIONS = [
+  {
+    value: 'particulier_employeur',
+    label: 'Particulier employeur (emploi déclaré)',
+    hint: "L'employeur (la famille) reste votre employeur légal. Salaire et cotisations gérés via le CESU officiel, en dehors d'OMLIINK. OMLIINK vous fournit le contrat de travail.",
+  },
+  {
+    value: 'auto_entrepreneur',
+    label: 'Auto-entrepreneur',
+    hint: "Vous facturez vos prestations comme travailleur indépendant, l'employeur devient votre client. Paiement sécurisé via Stripe Connect, commission OMLIINK de 10%.",
+  },
+] as const
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -27,9 +40,36 @@ function SubmitButton() {
 
 export default function CandidateProfileForm({ profile }: { profile: CandidateProfile }) {
   const [state, formAction] = useActionState(updateCandidateProfile, initialState)
+  const [employmentStatus, setEmploymentStatus] = useState(
+    profile.employment_status || 'particulier_employeur'
+  )
 
   return (
     <form action={formAction} noValidate className="flex flex-col gap-5">
+      <div>
+        <span className="mb-1 block text-sm font-medium text-gray-700">Statut</span>
+        <div role="radiogroup" aria-label="Statut" className="grid gap-3 sm:grid-cols-2">
+          {EMPLOYMENT_STATUS_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={employmentStatus === option.value}
+              onClick={() => setEmploymentStatus(option.value)}
+              className={`rounded-xl border p-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                employmentStatus === option.value
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : 'border-gray-200 text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <span className="block text-sm font-semibold">{option.label}</span>
+              <span className="mt-1 block text-xs text-gray-500">{option.hint}</span>
+            </button>
+          ))}
+        </div>
+        <input type="hidden" name="employment_status" value={employmentStatus} />
+      </div>
+
       <div>
         <label htmlFor="bio" className="mb-1 block text-sm font-medium text-gray-700">
           Bio

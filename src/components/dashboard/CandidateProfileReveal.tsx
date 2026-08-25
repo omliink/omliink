@@ -5,6 +5,11 @@ import type { Database } from '@/types/database.types'
 
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
 
+const EMPLOYMENT_STATUS_LABELS: Record<string, string> = {
+  particulier_employeur: 'Particulier employeur (emploi déclaré)',
+  auto_entrepreneur: 'Auto-entrepreneur',
+}
+
 export default function CandidateProfileReveal({ profile }: { profile: CandidateProfile | null }) {
   const [open, setOpen] = useState(false)
 
@@ -25,6 +30,9 @@ export default function CandidateProfileReveal({ profile }: { profile: Candidate
             <p className="text-gray-500">Profil non disponible.</p>
           ) : (
             <div className="flex flex-col gap-2">
+              <span className="w-fit rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                {EMPLOYMENT_STATUS_LABELS[profile.employment_status] ?? profile.employment_status}
+              </span>
               {profile.bio && <p>{profile.bio}</p>}
               {profile.skills && profile.skills.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">

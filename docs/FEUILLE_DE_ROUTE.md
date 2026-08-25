@@ -9,9 +9,9 @@
 ```
 SEMAINE  1  │ Phase 0: Setup & Configuration
 SEMAINES 2-3 │ Phase 1: Foundation (DB, Auth, Landing)
-SEMAINES 4-6 │ Phase 2: Core Features (Missions, Matching, Chat)
+SEMAINES 4-6 │ Phase 2: Core Features (Missions, Matching géo, Chat)
 SEMAINES 7-8 │ Phase 3: Visio & Contrats
-SEMAINE   9  │ Phase 4: URSSAF & Paiements
+SEMAINE   9  │ Phase 4: Statut Candidat & Paiements (Stripe Connect)
 SEMAINE  10  │ Phase 5: Polish & Dashboards
 SEMAINE  11  │ Phase 6: Déploiement Production
 ```
@@ -173,7 +173,8 @@ SEMAINE  11  │ Phase 6: Déploiement Production
 **Tâches:**
 - [ ] Stepper 5 étapes (catégorie, description, lieu, tarif, recap)
 - [ ] Mapbox autocomplete adresse
-- [ ] Cost simulator temps réel (URSSAF call)
+- [ ] Cost simulator temps réel (tarif × durée + commission, si statut
+      auto-entrepreneur ; hors URSSAF, voir Phase 4)
 - [ ] RHF + Zod validations
 - [ ] Save to DB
 
@@ -215,25 +216,34 @@ SEMAINE  11  │ Phase 6: Déploiement Production
 
 ---
 
-### Sprint 7: Matching Algorithm
+### Sprint 7: Matching Géographique (scope MVP — distance uniquement)
 
 **Semaine 6, Mercredi-Vendredi**
 
-**Objectif:** Algorithme matching IA + interface
+**Objectif:** Tri/filtre des missions par distance — **pas** l'algorithme de
+score multi-critères complet (celui-ci reste la vision cible à terme, voir
+[CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md#matching-algorithm), et
+viendra plus tard avec plus de données réelles d'usage)
 
 **Tâches:**
-- [ ] Edge Function matching (distance, dispo, réputation, etc.)
-- [ ] MatchList component + MatchScore animé
-- [ ] Top 10 candidats retournés
+- [ ] Migration `candidate_profiles` : ajouter `location_lat`, `location_lng`
+      (même autocomplete BAN que missions), `radius_km` — voir
+      [ARCHITECTURE_DATABASE.md](./ARCHITECTURE_DATABASE.md) pour le SQL
+- [ ] Calcul de distance par formule haversine (SQL ou applicatif — pas de
+      PostGIS à ce volume)
+- [ ] Côté candidat : missions triées/filtrées par distance, dans son rayon
+      d'action (`radius_km`)
+- [ ] Côté employeur : distance affichée sur chaque candidature reçue
+      (candidat ↔ lieu de la mission)
 - [ ] Tests avec seed data
 
 **Deliverables:**
-- `supabase/functions/matching/index.ts` ✅
-- `src/components/candidates/MatchList.tsx` ✅
-- `src/components/candidates/MatchScore.tsx` ✅
+- Migration `candidate_profiles` (location_lat/location_lng/radius_km) ✅
+- Tri par distance dashboard candidat ✅
+- Distance affichée sur les candidatures (vue employeur) ✅
 
 **Claude Code Prompts:**
-- PROMPT #9: Matching algorithm
+- PROMPT #9: Matching géographique (distance uniquement)
 
 **Durée:** 20 heures
 
@@ -268,7 +278,7 @@ SEMAINE  11  │ Phase 6: Déploiement Production
 
 ### Phase 2 Summary
 - **Total:** 125 heures (~21 heures/jour sur 6 jours)
-- **Livrables:** Missions complètes + Matching IA + Chat realtime
+- **Livrables:** Missions complètes + Matching géographique (distance) + Chat realtime
 - **Status:** ✅ Core features fonctionnelles
 
 ---
@@ -362,29 +372,47 @@ SEMAINE  11  │ Phase 6: Déploiement Production
 
 ---
 
-## 💰 PHASE 4 — URSSAF & PAIEMENTS (Semaine 9)
+## 💰 PHASE 4 — STATUT CANDIDAT & PAIEMENTS (Semaine 9)
 
-### Sprint 12: URSSAF Integration
+> Décision (recherche cadre légal français + comparaison Yoopies) : pas
+> d'intégration URSSAF API dans cette phase. OMLIINK gère un flux de
+> paiement réel uniquement pour les candidats au statut `auto_entrepreneur`,
+> via Stripe Connect. Pour le statut `particulier_employeur`, OMLIINK
+> fournit uniquement le générateur de contrat (déjà livré) — le salaire et
+> les cotisations restent gérés par l'employeur via le CESU officiel, hors
+> OMLIINK. Voir [CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md#statut-candidat--paiement)
+> et la migration `employment_status` dans
+> [ARCHITECTURE_DATABASE.md](./ARCHITECTURE_DATABASE.md).
+
+### Sprint 12: Statut Candidat & Stripe Connect
 
 **Semaine 9, Lundi-Mercredi**
 
-**Objectif:** Paiements + Déclarations URSSAF
+**Objectif:** Champ `employment_status` sur `candidate_profiles` + paiements
+Stripe Connect pour le seul flux `auto_entrepreneur`
 
 **Tâches:**
-- [ ] Edge Function urssaf-simulate (coût simulator)
-- [ ] Edge Function urssaf-declare (après confirmation heures)
-- [ ] Fiscal page employeur (total dépensé, crédit)
-- [ ] Earnings page candidat (revenus, graphiques)
-- [ ] Bulletins de paie PDF
+- [ ] Migration `employment_status` sur `candidate_profiles` (voir
+      ARCHITECTURE_DATABASE.md — à exécuter avant ce sprint)
+- [ ] Sélecteur de statut sur le profil candidat (information affichée,
+      recherche/candidature identiques pour les deux statuts)
+- [ ] Onboarding Stripe Connect (candidats `auto_entrepreneur` uniquement)
+- [ ] Edge Function / Server Action de paiement : encaissement, commission
+      10%, reversement du solde
+- [ ] Fiscal page employeur (montant facturé, mode de paiement affiché
+      selon le statut du candidat)
+- [ ] Earnings page candidat `auto_entrepreneur` (revenus, graphiques)
+- [ ] Pour `particulier_employeur` : page d'accompagnement CESU (liens
+      officiels, pas de traitement de paiement côté OMLIINK)
 
 **Deliverables:**
-- `supabase/functions/urssaf-simulate/index.ts` ✅
-- `supabase/functions/urssaf-declare/index.ts` ✅
-- `src/app/(dashboard)/employer/fiscal/page.tsx` ✅
-- `src/app/(dashboard)/candidate/earnings/page.tsx` ✅
+- Migration `employment_status` appliquée ✅
+- `src/lib/actions/stripe-connect.ts` (paiement auto-entrepreneur) ✅
+- `src/app/dashboard/employer/fiscal/page.tsx` ✅
+- `src/app/dashboard/candidate/earnings/page.tsx` ✅
 
 **Claude Code Prompts:**
-- PROMPT #15: URSSAF integration
+- PROMPT #15: Statut candidat + Stripe Connect (auto-entrepreneur uniquement)
 
 **Durée:** 20 heures
 
@@ -444,8 +472,8 @@ SEMAINE  11  │ Phase 6: Déploiement Production
 
 ### Phase 4 Summary
 - **Total:** 50 heures (~16 heures/jour sur 3 jours)
-- **Livrables:** URSSAF complet + Paiements + Avis + Notifications
-- **Status:** ✅ Système paiements en place
+- **Livrables:** Statut candidat + Stripe Connect (auto-entrepreneur) + Avis + Notifications
+- **Status:** ✅ Système paiements en place (hors URSSAF, hors périmètre actuel)
 
 ---
 
@@ -632,7 +660,7 @@ SEMAINE  11  │ Phase 6: Déploiement Production
 | **1** | 2-3 | 75 | DB + Auth + Landing |
 | **2** | 4-6 | 125 | Core Features |
 | **3** | 7-8 | 55 | Visio + Contrats |
-| **4** | 9 | 50 | URSSAF + Paiements |
+| **4** | 9 | 50 | Statut Candidat + Paiements (Stripe Connect) |
 | **5** | 10 | 50 | Dashboards + Polish |
 | **6** | 11 | 40 | Production + Launch |
 | **TOTAL** | **11** | **435** | **MVP Complet** |
@@ -644,9 +672,9 @@ SEMAINE  11  │ Phase 6: Déploiement Production
 ```
 Fin Semaine 1:    ✅ Environment ready
 Fin Semaine 3:    ✅ Auth fonctionnelle + Landing
-Fin Semaine 6:    ✅ Core features (Missions + Matching + Chat)
+Fin Semaine 6:    ✅ Core features (Missions + Matching géo + Chat)
 Fin Semaine 8:    ✅ Visio + Contrats
-Fin Semaine 9:    ✅ URSSAF + Paiements
+Fin Semaine 9:    ✅ Statut Candidat + Paiements (Stripe Connect)
 Fin Semaine 10:   ✅ Dashboards + Polish
 Fin Semaine 11:   🚀 Production Launch
 ```
@@ -673,14 +701,14 @@ Semaine 11:  100% (launch)
 
 ```
 🔴 HIGH RISK:
-  - Intégration URSSAF API (prioritaire semaine 9)
+  - Intégration Stripe Connect (KYC candidat auto-entrepreneur, prioritaire semaine 9)
   - Performance chat/visio temps réel
-  - Responsabilité juridique (CGU)
+  - Responsabilité juridique (CGU, notamment la distinction des deux statuts candidat)
 
 🟡 MEDIUM RISK:
   - LiveKit coûts (prévoir fallback)
   - Onfido KYC temps d'approbation
-  - Matching algo edge cases
+  - Matching géographique : précision adresse/rayon (formule haversine)
 
 🟢 LOW RISK:
   - Design polish (peut être différé)
@@ -690,7 +718,7 @@ Semaine 11:  100% (launch)
 ### Mitigation
 
 ```
-✅ URSSAF: Tester sandbox semaine 8 (avant semaine 9)
+✅ Stripe Connect: Tester en mode test semaine 8 (avant semaine 9)
 ✅ Chat/Visio: Load testing semaine 7-8
 ✅ Juridique: Validator externe semaine 10
 ✅ Performance: Monitoring Semaine 9+
@@ -706,10 +734,10 @@ Semaine 11:  100% (launch)
 → Lancer MVP sans Visio (dégradé mais fonctionnel)
 ```
 
-### Si problème URSSAF
+### Si problème Stripe Connect
 ```
-→ Implémenter déclaration manuelle temporaire
-→ Garder URSSAF en "beta" jusqu'à validation
+→ Garder le paiement auto-entrepreneur en "beta" jusqu'à validation
+→ Le flux particulier-employeur (CESU externe) n'est pas affecté
 ```
 
 ### Si retard général
