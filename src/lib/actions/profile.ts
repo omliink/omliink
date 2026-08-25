@@ -52,15 +52,18 @@ export async function updateCandidateProfile(
     employment_status: employmentStatus,
   }
 
-  // The address autocomplete only submits valid lat/lng when a suggestion
-  // was actually selected — an empty/unresolved address means "leave the
-  // previously saved location untouched" rather than "clear it".
+  // The address autocomplete only submits valid lat/lng (and a matching
+  // formatted label) when a suggestion was actually selected — an
+  // empty/unresolved address means "leave the previously saved location
+  // untouched" rather than "clear it".
+  const locationAddressRaw = String(formData.get('location_address') ?? '').trim()
   const locationLatRaw = formData.get('location_lat')
   const locationLngRaw = formData.get('location_lng')
   if (locationLatRaw && locationLngRaw) {
     const lat = Number(locationLatRaw)
     const lng = Number(locationLngRaw)
     if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      updatePayload.location_address = locationAddressRaw || null
       updatePayload.location_lat = lat
       updatePayload.location_lng = lng
     }

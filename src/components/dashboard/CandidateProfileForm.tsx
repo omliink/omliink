@@ -80,9 +80,7 @@ export default function CandidateProfileForm({ profile }: { profile: CandidatePr
           latName="location_lat"
           lngName="location_lng"
           label="Adresse de référence"
-          defaultValue={
-            profile.location_lat != null && profile.location_lng != null ? 'Position enregistrée' : undefined
-          }
+          defaultValue={profile.location_address ?? undefined}
           defaultLat={profile.location_lat}
           defaultLng={profile.location_lng}
         />
