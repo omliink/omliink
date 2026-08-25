@@ -42,12 +42,16 @@ export default function MissionCard({ mission, variant, categoryName, applicatio
         <StatusBadge status={mission.status} />
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
-        {variant === 'candidate' && mission.location_address && <span>{mission.location_address}</span>}
-        <span>{formatDate(mission.mission_date)}</span>
-        <span>{formatBudget(mission.budget)}</span>
+      <div className="mt-4 flex items-start justify-between gap-x-3 gap-y-2 text-sm text-gray-500">
+        <div className="flex min-w-0 flex-1 flex-wrap gap-x-4 gap-y-1">
+          {variant === 'candidate' && mission.location_address && <span>{mission.location_address}</span>}
+          <span>{formatDate(mission.mission_date)}</span>
+          <span>{formatBudget(mission.budget)}</span>
+        </div>
         {variant === 'candidate' && distanceKm != null && (
-          <span className="font-medium text-indigo-600">{formatDistance(distanceKm)}</span>
+          <span className="inline-flex shrink-0 items-center rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600">
+            {formatDistance(distanceKm)}
+          </span>
         )}
       </div>
 
