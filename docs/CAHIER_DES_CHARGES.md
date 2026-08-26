@@ -115,49 +115,98 @@ Domaine: omliink.fr + SSL
 
 ## 💰 Modèle Économique
 
-### Revenus
+Décision prise après comparaison explicite avec **Yoopies** (leader du
+marché) : privilégier l'acquisition et le volume de missions publiées
+plutôt que la monétisation immédiate de chaque geste, et concentrer le
+seul revenu transactionnel actif sur le flux où OMLIINK gère réellement
+l'argent.
 
-**Commission (Principal) — 10%**
+### Phase actuelle (MVP)
+
+**Publication de mission — Gratuite**
+- Aucune limite de missions/mois, aucune friction, aucun palier payant à
+  l'entrée
+- Choix délibéré : maximiser le volume de missions publiées plutôt que de
+  monétiser ce geste dès le lancement
+
+**Commission — 10%, sur le seul flux `auto_entrepreneur`**
 - Prélevée uniquement sur les missions où le candidat a le statut
-  `auto_entrepreneur` (seul flux où OMLIINK encaisse réellement de l'argent,
-  via Stripe Connect — voir [Statut Candidat & Paiement](#statut-candidat--paiement))
+  `auto_entrepreneur` — c'est le **seul revenu transactionnel actif** au
+  lancement (paiement via Stripe Connect, déjà en cours de construction —
+  voir [Statut Candidat & Paiement](#statut-candidat--paiement))
 - Côté employeur (montant facturé, la commission est retenue sur le
   reversement au candidat)
 - À chaque mission validée
-- Possible réduction partenariats
 
-**Abonnement Premium Employeur — 9,90€/mois**
-- Gratuit: 3 missions/mois, commission 12%
-- Premium: illimité, commission 8%, visios 30min
+**Statut `particulier_employeur` — zéro revenu direct**
+- Contrat de travail généré gratuitement, paiement intégralement hors
+  plateforme via le CESU officiel
+- Ce n'est pas un oubli : c'est un choix stratégique délibéré pour
+  maximiser l'adoption de ce statut, qui reste malgré tout le cas d'usage
+  le plus proche du besoin réel de nombreux employeurs (emploi déclaré
+  classique)
 
-**Boosts Visibilité Candidat — 2,99€/semaine**
-- Apparaître en tête du matching
+### Roadmap monétisation future (hors scope du sprint actuel)
 
-**Partenariats**
-- CE (CESU préfinancés)
-- Assurances responsabilité civile
-- Formations professionnelles
+À explorer une fois qu'on aura du recul sur l'usage réel — volume de
+missions, taux de conversion candidat `auto_entrepreneur` vs
+`particulier_employeur`. Rien ci-dessous n'est engagé ou construit
+aujourd'hui.
 
-### Projection Financière (1000 missions/mois à 50€ moyen)
+**Options premium employeur** (inspiré du modèle Yoopies : *"Options
+premium payantes — Mise en avant des annonces, Contacts illimités, Accès
+aux numéros de téléphone"*)
+- Mise en avant d'annonce
+- Accès prioritaire ou illimité aux profils candidats
+- Contacts illimités
+
+**Abonnement mensuel employeur** (usage récurrent)
+- À évaluer séparément — nécessite un produit Stripe différent (**Stripe
+  Billing / Subscriptions**, distinct de **Stripe Connect** utilisé pour la
+  commission auto-entrepreneur)
+- Volontairement non mélangé avec le sprint paiement actuel pour éviter
+  d'ajouter de la complexité avant d'avoir validé le flux de base
+
+**Autres leviers non engagés**
+- Boost de visibilité candidat dans le matching
+- Partenariats (CE / CESU préfinancés, assurances responsabilité civile,
+  formations professionnelles)
+
+**Objectif affiché** : faire au moins aussi bien que Yoopies sur
+l'acquisition (gratuité d'entrée), tout en gardant plusieurs leviers de
+revenus futurs ouverts et non engagés prématurément.
+
+> ⚠️ Ce choix de monétisation sera réévalué à la lumière de données d'usage
+> réelles (volume de missions publiées, taux de conversion
+> `auto_entrepreneur` vs `particulier_employeur`) plutôt que figé
+> définitivement maintenant.
+
+### Projection Financière — vision long terme (pas la réalité du MVP actuel)
+
+Cette projection suppose un modèle plus mature (options premium employeur
++ abonnement en place) et **ne reflète pas** le MVP actuel, où seul le
+flux `auto_entrepreneur` génère de la commission — le reste (missions
+`particulier_employeur`, publication) est gratuit par choix.
 
 ```
-Commissions (10%):      5 000€/mois
-Abonnements Premium:    1 980€/mois
-Boosts Candidat:        1 196€/mois
-─────────────────────────────────────
-TOTAL REVENU:          ~8 176€/mois
+Commissions (10%, hypothèse: toutes missions payantes): 5 000€/mois
+Abonnements Premium (hypothèse future):                 1 980€/mois
+Boosts / options premium (hypothèse future):             1 196€/mois
+─────────────────────────────────────────────────────────────────
+TOTAL REVENU (vision long terme):                       ~8 176€/mois
 
-Coûts opérationnels:    ~150€/mois
-─────────────────────────────────────
-MARGE BRUTE:           95%+ ✅
+Coûts opérationnels:                                       ~150€/mois
+─────────────────────────────────────────────────────────────────
+MARGE BRUTE:                                                95%+ ✅
 ```
 
-### Seuil Rentabilité
+### Seuil de rentabilité — même mise en garde
 
 ```
-100 missions/mois × 50€ × 10% = 500€/mois
+100 missions/mois × 50€ × 10% = 500€/mois (si 100% des missions étaient
+commissionnables — hypothèse long terme, pas la réalité MVP où seule la
+part auto-entrepreneur l'est)
 Coûts: 150€
-→ Profitable à 100 missions/mois (très bas)
 ```
 
 ---
