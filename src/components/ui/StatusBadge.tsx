@@ -16,6 +16,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   signed_by_employer: { label: 'Signé par l’employeur', className: 'bg-amber-100 text-amber-700' },
   signed_by_candidate: { label: 'Signé par le candidat', className: 'bg-amber-100 text-amber-700' },
   signed: { label: 'Signé', className: 'bg-emerald-100 text-emerald-700' },
+  paid: { label: 'Payé', className: 'bg-emerald-100 text-emerald-700' },
 }
 
 export default function StatusBadge({ status }: { status: string }) {

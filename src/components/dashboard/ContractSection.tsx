@@ -1,14 +1,20 @@
+import Link from 'next/link'
 import StatusBadge from '@/components/ui/StatusBadge'
 import SignContractButton from './SignContractButton'
+import PayMissionButton from './PayMissionButton'
 import type { Database } from '@/types/database.types'
 
 type Contract = Database['public']['Tables']['contracts']['Row']
 type Mission = Database['public']['Tables']['missions']['Row']
+type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
+
+const PLATFORM_FEE_RATE = 0.1
 
 interface ContractSectionProps {
   contract: Contract
   mission: Mission
   isEmployerViewer: boolean
+  candidateProfile: CandidateProfile | null
 }
 
 function formatAmount(value: number | null) {
@@ -16,7 +22,66 @@ function formatAmount(value: number | null) {
   return `${value.toLocaleString('fr-FR')} €`
 }
 
-export default function ContractSection({ contract, mission, isEmployerViewer }: ContractSectionProps) {
+function PaymentStatus({
+  contract,
+  mission,
+  isEmployerViewer,
+  candidateProfile,
+}: {
+  contract: Contract
+  mission: Mission
+  isEmployerViewer: boolean
+  candidateProfile: CandidateProfile | null
+}) {
+  if (candidateProfile?.employment_status !== 'auto_entrepreneur') {
+    return (
+      <p className="text-sm text-gray-600">
+        Le règlement de cette mission se fait directement entre vous et le candidat, via le dispositif CESU.
+      </p>
+    )
+  }
+
+  const netAmount = contract.total_amount != null ? contract.total_amount * (1 - PLATFORM_FEE_RATE) : null
+
+  if (contract.payment_status === 'paid') {
+    return (
+      <div className="flex flex-col gap-1">
+        <StatusBadge status="paid" />
+        {netAmount != null && (
+          <p className="text-sm text-gray-600">Montant net reçu par le candidat : {formatAmount(netAmount)}</p>
+        )}
+      </div>
+    )
+  }
+
+  if (!candidateProfile.stripe_connect_onboarded) {
+    return isEmployerViewer ? (
+      <p className="text-sm text-gray-500">En attente que le candidat configure son compte de paiement.</p>
+    ) : (
+      <p className="text-sm text-gray-500">
+        <Link href="/dashboard/profile" className="text-indigo-600 underline hover:text-indigo-700">
+          Configurez votre compte de paiement
+        </Link>{' '}
+        sur votre profil pour recevoir le règlement de cette mission.
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {netAmount != null && (
+        <p className="text-xs text-gray-500">Montant net que recevra le candidat : {formatAmount(netAmount)}</p>
+      )}
+      {isEmployerViewer ? (
+        <PayMissionButton contractId={contract.id} missionId={mission.id} amount={contract.total_amount ?? 0} />
+      ) : (
+        <p className="text-sm text-gray-500">En attente du paiement de l&apos;employeur.</p>
+      )}
+    </div>
+  )
+}
+
+export default function ContractSection({ contract, mission, isEmployerViewer, candidateProfile }: ContractSectionProps) {
   const hasSignedAsViewer =
     contract.status === 'signed' ||
     (isEmployerViewer && contract.status === 'signed_by_employer') ||
@@ -58,6 +123,17 @@ export default function ContractSection({ contract, mission, isEmployerViewer }:
             <SignContractButton contractId={contract.id} missionId={mission.id} />
           )}
         </div>
+
+        {contract.status === 'signed' && (
+          <div className="mt-5 border-t border-gray-100 pt-5">
+            <PaymentStatus
+              contract={contract}
+              mission={mission}
+              isEmployerViewer={isEmployerViewer}
+              candidateProfile={candidateProfile}
+            />
+          </div>
+        )}
       </div>
     </section>
   )

@@ -47,6 +47,8 @@ type CandidateProfilesRow = {
   location_lat: number | null
   location_lng: number | null
   radius_km: number
+  stripe_connect_account_id: string | null
+  stripe_connect_onboarded: boolean
   rating: number
   total_missions_completed: number
   response_rate: number
@@ -68,6 +70,8 @@ type CandidateProfilesInsert = {
   location_lat?: number | null
   location_lng?: number | null
   radius_km?: number
+  stripe_connect_account_id?: string | null
+  stripe_connect_onboarded?: boolean
   rating?: number
   total_missions_completed?: number
   response_rate?: number

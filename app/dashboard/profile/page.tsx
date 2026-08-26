@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import CandidateProfileForm from '@/components/dashboard/CandidateProfileForm'
 import EmployerProfileForm from '@/components/dashboard/EmployerProfileForm'
+import StripeConnectSection from '@/components/dashboard/StripeConnectSection'
 import { getCandidateProfile, getCurrentUser, getEmployerProfile, getProfile } from '@/lib/dashboard-data'
 
 export default async function ProfilePage() {
@@ -47,6 +48,8 @@ export default async function ProfilePage() {
           </div>
         </section>
       )}
+
+      {profile.is_candidate && candidateProfile && <StripeConnectSection profile={candidateProfile} />}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { haversineDistanceKm } from '@/lib/geo'
 import {
   getApplicationForMissionAndCandidate,
   getApplicationsForMission,
+  getCandidateProfile,
   getCandidateProfilesByUserIds,
   getCategories,
   getContractByMissionId,
@@ -84,6 +85,9 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
     getContractByMissionId(mission.id),
   ])
   const isVisioParticipant = isOwner || Boolean(visioMeeting && visioMeeting.candidate_id === user.id)
+  const contractCandidateProfile = contract
+    ? (candidateProfileById.get(contract.candidate_id) ?? (await getCandidateProfile(contract.candidate_id)))
+    : null
   // This Server Component renders once per request — there's no re-render to
   // go stale, so the purity rule (aimed at memoized client components) does
   // not apply here.
@@ -162,7 +166,12 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
       )}
 
       {contract && isVisioParticipant && (
-        <ContractSection contract={contract} mission={mission} isEmployerViewer={isOwner} />
+        <ContractSection
+          contract={contract}
+          mission={mission}
+          isEmployerViewer={isOwner}
+          candidateProfile={contractCandidateProfile}
+        />
       )}
     </div>
   )
