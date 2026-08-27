@@ -243,86 +243,116 @@ candidat voit les missions triées/filtrées par distance à sa position, dans
 son rayon d'action ; (2) l'employeur voit, sur chaque candidature reçue, la
 distance entre le candidat et le lieu de la mission.
 
-#### Champs cibles — Sprint 4b (onboarding candidat, wizard 9 étapes)
+#### Champs — Sprint 4b (onboarding candidat, wizard 9 étapes)
 
-Schéma cible après Sprint 4b — migrations réelles créées et appliquées
-manuellement au moment de ce sprint, pas maintenant (voir
-[Migrations](#migrations)) :
+Schéma tel qu'appliqué (migration
+`20260829000000_sprint4b_candidate_wizard_schema.sql`). Diverge sur
+plusieurs points de la première passe documentaire ci-dessus — écarts
+délibérés confirmés au moment du sprint, détaillés en commentaire dans la
+migration elle-même :
 
 ```sql
-gender                     TEXT             -- étape 1
+gender                     VARCHAR(20)      -- étape 1 : 'homme', 'femme'
 birth_date                 DATE             -- étape 2
-birth_place                TEXT             -- étape 2
-native_language             TEXT             -- étape 2 (langue natale ;
+birth_place                VARCHAR(255)     -- étape 2
+native_language             VARCHAR(100)     -- étape 2 (langue natale ;
                                              --   langues additionnelles
                                              --   via candidate_languages)
-phone_visible               BOOLEAN DEFAULT FALSE -- étape 2
+phone_visible               BOOLEAN NOT NULL DEFAULT TRUE -- étape 2
 photo_url                   TEXT NOT NULL    -- étape 3, OBLIGATOIRE (bloquant)
-experience_level             TEXT             -- étape 6 : 'debutant',
-                                             --   'intermediaire', 'experimente'
-bio_title                   TEXT             -- étape 8
-bio_text                   TEXT             -- étape 8
-verification_status         TEXT DEFAULT 'not_submitted'
-                                             -- 'not_submitted', 'pending',
+experience_level             VARCHAR(20)      -- étape 6 : 'debutant',
+                                             --   '1-3ans', '3-5ans',
+                                             --   '5ans-plus'
+bio_title                   VARCHAR(60)      -- étape 8, 10-60 caractères (appli)
+bio_text                   TEXT             -- étape 8, 30-2000 caractères (appli)
+verification_status         VARCHAR(20) NOT NULL DEFAULT 'unverified'
+                                             -- 'unverified', 'pending',
                                              --   'verified', 'rejected'
-verification_document_url    TEXT             -- pièce d'identité uploadée
+verification_document_url    TEXT             -- chemin du fichier dans le
+                                             --   bucket privé
+                                             --   verification-documents
+                                             --   (pas une URL publique)
 ```
 
-> ⚠️ `photo_url` est `NOT NULL` côté cible : l'étape 3 du wizard est
-> bloquante (pas de bouton "ignorer"), donc aucune ligne `candidate_profiles`
-> ne devrait exister sans photo une fois Sprint 4b en place.
+> ⚠️ `photo_url` est `NOT NULL`. Les lignes `candidate_profiles`
+> pré-existant à ce sprint (comptes de test) ont été backfillées avec une
+> chaîne vide avant l'ajout de la contrainte — voir la migration.
 
 #### Nouvelles tables associées — Sprint 4b
 
 ```sql
 -- Langues supplémentaires parlées (au-delà de native_language)
 CREATE TABLE candidate_languages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
-  language TEXT NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW(),
+  language VARCHAR(100) NOT NULL,
+  is_native BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(candidate_id, language)
 );
 
 -- Types de services sélectionnés à l'étape 4 (multi-select 15 catégories)
 CREATE TABLE candidate_service_types (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
-  category_id UUID NOT NULL REFERENCES service_categories(id),
-  created_at TIMESTAMP DEFAULT NOW(),
+  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(candidate_id, category_id)
 );
 
--- Suppléments étape 5 (premiers secours, motorisé, permis, dispo immédiate)
+-- Suppléments étape 5
 CREATE TABLE candidate_supplements (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
-  supplement TEXT NOT NULL,
-  -- 'first_aid', 'has_vehicle', 'driving_license', 'immediate_availability'
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(candidate_id, supplement)
+  supplement_code VARCHAR(50) NOT NULL,
+  -- 'premiers_secours', 'motorise', 'permis_conduire', 'dispo_immediate'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(candidate_id, supplement_code)
 );
 
 -- Référentiel des tags de compétences par catégorie (voir annexe
--- CAHIER_DES_CHARGES.md → Onboarding Candidat)
+-- CAHIER_DES_CHARGES.md → Onboarding Candidat) — table de référence
+-- publique, pas de owner candidat.
 CREATE TABLE skill_taxonomy (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  category_id UUID NOT NULL REFERENCES service_categories(id),
-  tag TEXT NOT NULL,
-  sort_order INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(category_id, tag)
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
+  skill_tag VARCHAR(100) NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(category_id, skill_tag)
 );
 
--- Compétences choisies par le candidat à l'étape 7, parmi skill_taxonomy
+-- Compétences choisies par le candidat à l'étape 7. Dénormalisé
+-- (category_id, skill_tag) directement plutôt qu'un skill_id unique, avec
+-- une FK composite vers skill_taxonomy(category_id, skill_tag) : empêche
+-- au niveau base qu'un candidat rattache un skill_tag à la mauvaise
+-- catégorie.
 CREATE TABLE candidate_skills (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
-  skill_id UUID NOT NULL REFERENCES skill_taxonomy(id),
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(candidate_id, skill_id)
+  category_id UUID NOT NULL,
+  skill_tag VARCHAR(100) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(candidate_id, category_id, skill_tag),
+  FOREIGN KEY (category_id, skill_tag) REFERENCES skill_taxonomy(category_id, skill_tag) ON DELETE CASCADE
 );
 ```
+
+RLS sur les 4 tables candidat-owned (`candidate_languages`,
+`candidate_service_types`, `candidate_supplements`, `candidate_skills`) :
+gestion complète par le candidat (`candidate_id = auth.uid()`) + lecture
+employeur via candidature existante, exact copié-collé du pattern
+`candidate_profiles_select_via_application` (Sprint 2) — un `EXISTS`
+à sens unique vers `applications`/`missions`, jamais l'inverse, donc aucun
+risque de la récursion RLS rencontrée au Sprint 3. `skill_taxonomy` est en
+lecture publique (`SELECT true`), sans policy d'écriture (peuplée par
+migration de seed uniquement).
+
+Deux buckets Storage (migration `20260829020000_sprint4b_storage_buckets.sql`) :
+`candidate-photos` (public, upload restreint au dossier `{auth.uid()}/…` du
+candidat) et `verification-documents` (privé, même restriction de dossier ;
+revue manuelle par l'équipe via le rôle service, pas d'interface de revue
+applicative à ce stade).
 
 ---
 

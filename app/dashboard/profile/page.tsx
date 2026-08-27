@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import CandidateProfileForm from '@/components/dashboard/CandidateProfileForm'
 import EmployerProfileForm from '@/components/dashboard/EmployerProfileForm'
 import StripeConnectSection from '@/components/dashboard/StripeConnectSection'
+import VerificationBanner from '@/components/dashboard/VerificationBanner'
+import VerificationBadge from '@/components/ui/VerificationBadge'
 import { getCandidateProfile, getCurrentUser, getEmployerProfile, getProfile } from '@/lib/dashboard-data'
 
 export default async function ProfilePage() {
@@ -42,7 +44,15 @@ export default async function ProfilePage() {
 
       {profile.is_candidate && candidateProfile && (
         <section>
-          <h2 className="text-lg font-semibold text-gray-900">Profil candidat</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-gray-900">Profil candidat</h2>
+            <VerificationBadge status={candidateProfile.verification_status} />
+          </div>
+          {candidateProfile.verification_status === 'unverified' && (
+            <div className="mt-4">
+              <VerificationBanner />
+            </div>
+          )}
           <div className="mt-4">
             <CandidateProfileForm profile={candidateProfile} />
           </div>

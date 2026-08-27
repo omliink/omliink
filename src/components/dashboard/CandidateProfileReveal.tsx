@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import VerificationBadge from '@/components/ui/VerificationBadge'
 import type { Database } from '@/types/database.types'
 
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
@@ -30,10 +31,18 @@ export default function CandidateProfileReveal({ profile }: { profile: Candidate
             <p className="text-gray-500">Profil non disponible.</p>
           ) : (
             <div className="flex flex-col gap-2">
-              <span className="w-fit rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-                {EMPLOYMENT_STATUS_LABELS[profile.employment_status] ?? profile.employment_status}
-              </span>
-              {profile.bio && <p>{profile.bio}</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                {profile.photo_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profile.photo_url} alt="" className="h-10 w-10 rounded-full object-cover" />
+                )}
+                <span className="w-fit rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                  {EMPLOYMENT_STATUS_LABELS[profile.employment_status] ?? profile.employment_status}
+                </span>
+                <VerificationBadge status={profile.verification_status} />
+              </div>
+              {profile.bio_title && <p className="font-semibold text-gray-900">{profile.bio_title}</p>}
+              {(profile.bio_text ?? profile.bio) && <p>{profile.bio_text ?? profile.bio}</p>}
               {profile.skills && profile.skills.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {profile.skills.map((skill) => (

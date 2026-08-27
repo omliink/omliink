@@ -56,18 +56,18 @@ CREATE TABLE candidate_profiles (
   no_show_count INTEGER DEFAULT 0,
 
   -- Onboarding candidat wizard 9 étapes (Sprint 4b)
-  gender VARCHAR(50),                       -- étape 1
+  gender VARCHAR(20),                       -- étape 1: 'homme', 'femme'
   birth_date DATE,                          -- étape 2
   birth_place VARCHAR(255),                 -- étape 2
   native_language VARCHAR(100),             -- étape 2
-  phone_visible BOOLEAN DEFAULT FALSE,      -- étape 2
+  phone_visible BOOLEAN NOT NULL DEFAULT TRUE, -- étape 2
   photo_url TEXT NOT NULL,                  -- étape 3, OBLIGATOIRE (bloquant)
-  experience_level VARCHAR(50),             -- étape 6: 'debutant', 'intermediaire', 'experimente'
-  bio_title VARCHAR(255),                   -- étape 8
-  bio_text TEXT,                            -- étape 8
-  verification_status VARCHAR(50) DEFAULT 'not_submitted',
-  -- 'not_submitted', 'pending', 'verified', 'rejected'
-  verification_document_url TEXT,           -- pièce d'identité uploadée
+  experience_level VARCHAR(20),             -- étape 6: 'debutant', '1-3ans', '3-5ans', '5ans-plus'
+  bio_title VARCHAR(60),                    -- étape 8, 10-60 caractères (validation applicative)
+  bio_text TEXT,                            -- étape 8, 30-2000 caractères (validation applicative)
+  verification_status VARCHAR(20) NOT NULL DEFAULT 'unverified',
+  -- 'unverified', 'pending', 'verified', 'rejected'
+  verification_document_url TEXT,           -- chemin dans le bucket privé verification-documents (pas une URL publique)
 
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
@@ -474,19 +474,19 @@ CREATE POLICY "Employers can manage their favorites"
   ON favorite_candidates FOR ALL USING (employer_id = auth.uid());
 
 -- ========================================
--- 19. SKILL_TAXONOMY (Sprint 4b — référentiel, pas de RLS candidat)
+-- 19. SKILL_TAXONOMY (Sprint 4b — référentiel public, pas de owner candidat)
 -- ========================================
 CREATE TABLE skill_taxonomy (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  category_id UUID NOT NULL REFERENCES service_categories(id),
-  tag VARCHAR(255) NOT NULL,
-  sort_order INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(category_id, tag)
+  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
+  skill_tag VARCHAR(100) NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(category_id, skill_tag)
 );
 
 ALTER TABLE skill_taxonomy ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Everyone can view skill taxonomy"
+CREATE POLICY "skill_taxonomy_select_all"
   ON skill_taxonomy FOR SELECT USING (TRUE);
 
 -- ========================================
@@ -496,13 +496,21 @@ CREATE TABLE candidate_languages (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
   language VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW(),
+  is_native BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(candidate_id, language)
 );
 
 ALTER TABLE candidate_languages ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Candidates can manage their own languages"
-  ON candidate_languages FOR ALL USING (candidate_id = auth.uid());
+CREATE POLICY "candidate_languages_manage_own"
+  ON candidate_languages FOR ALL USING (candidate_id = auth.uid()) WITH CHECK (candidate_id = auth.uid());
+CREATE POLICY "candidate_languages_select_via_application"
+  ON candidate_languages FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM applications JOIN missions ON missions.id = applications.mission_id
+      WHERE applications.candidate_id = candidate_languages.candidate_id AND missions.employer_id = auth.uid()
+    )
+  );
 
 -- ========================================
 -- 21. CANDIDATE_SERVICE_TYPES (Sprint 4b — wizard étape 4)
@@ -510,16 +518,21 @@ CREATE POLICY "Candidates can manage their own languages"
 CREATE TABLE candidate_service_types (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
-  category_id UUID NOT NULL REFERENCES service_categories(id),
-  created_at TIMESTAMP DEFAULT NOW(),
+  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(candidate_id, category_id)
 );
 
 ALTER TABLE candidate_service_types ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Candidates can manage their own service types"
-  ON candidate_service_types FOR ALL USING (candidate_id = auth.uid());
-CREATE POLICY "Everyone can view candidate service types"
-  ON candidate_service_types FOR SELECT USING (TRUE);
+CREATE POLICY "candidate_service_types_manage_own"
+  ON candidate_service_types FOR ALL USING (candidate_id = auth.uid()) WITH CHECK (candidate_id = auth.uid());
+CREATE POLICY "candidate_service_types_select_via_application"
+  ON candidate_service_types FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM applications JOIN missions ON missions.id = applications.mission_id
+      WHERE applications.candidate_id = candidate_service_types.candidate_id AND missions.employer_id = auth.uid()
+    )
+  );
 
 -- ========================================
 -- 22. CANDIDATE_SUPPLEMENTS (Sprint 4b — wizard étape 5)
@@ -527,34 +540,60 @@ CREATE POLICY "Everyone can view candidate service types"
 CREATE TABLE candidate_supplements (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
-  supplement VARCHAR(100) NOT NULL,
-  -- 'first_aid', 'has_vehicle', 'driving_license', 'immediate_availability'
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(candidate_id, supplement)
+  supplement_code VARCHAR(50) NOT NULL,
+  -- 'premiers_secours', 'motorise', 'permis_conduire', 'dispo_immediate'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(candidate_id, supplement_code)
 );
 
 ALTER TABLE candidate_supplements ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Candidates can manage their own supplements"
-  ON candidate_supplements FOR ALL USING (candidate_id = auth.uid());
-CREATE POLICY "Everyone can view candidate supplements"
-  ON candidate_supplements FOR SELECT USING (TRUE);
+CREATE POLICY "candidate_supplements_manage_own"
+  ON candidate_supplements FOR ALL USING (candidate_id = auth.uid()) WITH CHECK (candidate_id = auth.uid());
+CREATE POLICY "candidate_supplements_select_via_application"
+  ON candidate_supplements FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM applications JOIN missions ON missions.id = applications.mission_id
+      WHERE applications.candidate_id = candidate_supplements.candidate_id AND missions.employer_id = auth.uid()
+    )
+  );
 
 -- ========================================
 -- 23. CANDIDATE_SKILLS (Sprint 4b — wizard étape 7)
+-- Dénormalisé (category_id, skill_tag) avec FK composite vers
+-- skill_taxonomy(category_id, skill_tag) plutôt qu'un skill_id unique :
+-- empêche au niveau base qu'un candidat rattache un tag à la mauvaise
+-- catégorie.
 -- ========================================
 CREATE TABLE candidate_skills (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
-  skill_id UUID NOT NULL REFERENCES skill_taxonomy(id),
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(candidate_id, skill_id)
+  category_id UUID NOT NULL,
+  skill_tag VARCHAR(100) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(candidate_id, category_id, skill_tag),
+  FOREIGN KEY (category_id, skill_tag) REFERENCES skill_taxonomy(category_id, skill_tag) ON DELETE CASCADE
 );
 
 ALTER TABLE candidate_skills ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Candidates can manage their own skills"
-  ON candidate_skills FOR ALL USING (candidate_id = auth.uid());
-CREATE POLICY "Everyone can view candidate skills"
-  ON candidate_skills FOR SELECT USING (TRUE);
+CREATE POLICY "candidate_skills_manage_own"
+  ON candidate_skills FOR ALL USING (candidate_id = auth.uid()) WITH CHECK (candidate_id = auth.uid());
+CREATE POLICY "candidate_skills_select_via_application"
+  ON candidate_skills FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM applications JOIN missions ON missions.id = applications.mission_id
+      WHERE applications.candidate_id = candidate_skills.candidate_id AND missions.employer_id = auth.uid()
+    )
+  );
+
+-- ========================================
+-- 19b. STORAGE BUCKETS (Sprint 4b)
+-- ========================================
+-- candidate-photos: public (les employeurs doivent voir la photo), écriture
+-- restreinte au dossier {auth.uid()}/… du candidat.
+-- verification-documents: privé, même restriction de dossier ; revue
+-- manuelle via le rôle service (pas d'interface de revue applicative).
+-- Voir la migration 20260829020000_sprint4b_storage_buckets.sql pour le
+-- détail des policies storage.objects.
 
 -- ========================================
 -- 24. PROMO_CODES (Sprint 4d — abonnement Premium)

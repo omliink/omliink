@@ -1,10 +1,12 @@
 import { cache } from 'react'
 import { createServerSupabaseClient } from './supabase-server'
+import { haversineDistanceKm } from './geo'
 import type { Database } from '@/types/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 type Mission = Database['public']['Tables']['missions']['Row']
 type ServiceCategory = Database['public']['Tables']['service_categories']['Row']
+type SkillTaxonomy = Database['public']['Tables']['skill_taxonomy']['Row']
 type Application = Database['public']['Tables']['applications']['Row']
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
 type EmployerProfile = Database['public']['Tables']['employer_profiles']['Row']
@@ -31,6 +33,12 @@ export const getProfile = cache(async (userId: string): Promise<Profile | null> 
 export const getCategories = cache(async (): Promise<ServiceCategory[]> => {
   const supabase = await createServerSupabaseClient()
   const { data } = await supabase.from('service_categories').select('*').order('sort_order', { ascending: true })
+  return data ?? []
+})
+
+export const getSkillTaxonomy = cache(async (): Promise<SkillTaxonomy[]> => {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('skill_taxonomy').select('*').order('label', { ascending: true })
   return data ?? []
 })
 
@@ -113,6 +121,53 @@ export async function getApplicationForMissionAndCandidate(
     .eq('candidate_id', candidateId)
     .maybeSingle()
   return data
+}
+
+export async function getCandidateServiceCategoryIds(candidateId: string): Promise<string[]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('candidate_service_types').select('category_id').eq('candidate_id', candidateId)
+  return (data ?? []).map((row) => row.category_id)
+}
+
+export interface SuggestedMission extends Mission {
+  distanceKm: number | null
+}
+
+// Used right after onboarding completes (dashboard's "Missions suggérées"
+// banner) — matches the candidate's chosen service categories, ranked by
+// distance from their reference address via the existing haversine helper.
+export async function getSuggestedMissionsForCandidate(candidateId: string, limit = 5): Promise<SuggestedMission[]> {
+  const [profile, categoryIds] = await Promise.all([
+    getCandidateProfile(candidateId),
+    getCandidateServiceCategoryIds(candidateId),
+  ])
+  if (!profile || categoryIds.length === 0) return []
+
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('missions')
+    .select('*')
+    .eq('status', 'published')
+    .in('category_id', categoryIds)
+    .order('mission_date', { ascending: true })
+
+  const lat = profile.location_lat
+  const lng = profile.location_lng
+
+  return (data ?? [])
+    .map((mission) => ({
+      ...mission,
+      distanceKm:
+        lat != null && lng != null && mission.location_lat != null && mission.location_lng != null
+          ? haversineDistanceKm(lat, lng, mission.location_lat, mission.location_lng)
+          : null,
+    }))
+    .sort((a, b) => {
+      if (a.distanceKm == null) return 1
+      if (b.distanceKm == null) return -1
+      return a.distanceKm - b.distanceKm
+    })
+    .slice(0, limit)
 }
 
 export async function getCandidateProfile(userId: string): Promise<CandidateProfile | null> {

@@ -18,6 +18,7 @@ interface AddressAutocompleteProps {
   defaultLat?: number | null
   defaultLng?: number | null
   required?: boolean
+  onSelect?: (suggestion: AddressSuggestion) => void
 }
 
 interface AddressApiFeature {
@@ -35,6 +36,7 @@ export default function AddressAutocomplete({
   defaultLat,
   defaultLng,
   required,
+  onSelect,
 }: AddressAutocompleteProps) {
   const [query, setQuery] = useState(defaultValue ?? '')
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([])
@@ -96,6 +98,7 @@ export default function AddressAutocomplete({
     setQuery(suggestion.label)
     setSuggestions([])
     setOpen(false)
+    onSelect?.(suggestion)
   }
 
   return (

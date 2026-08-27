@@ -345,13 +345,28 @@ l'historique de la visio.
 
 ## 🧩 Onboarding Candidat
 
-Décision Sprint 4b : wizard d'inscription en **9 étapes**, adapté au
-modèle **mission-first** d'OMLIINK — pas de profil-vitrine public
+Décision Sprint 4b : wizard d'inscription en **9 étapes** (8 étapes de
+saisie dans l'interface wizard + une 9ème étape "Missions suggérées"),
+adapté au modèle **mission-first** d'OMLIINK — pas de profil-vitrine public
 contactable librement (voir
 [Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté)). Le
 profil enrichi sert à candidater efficacement et à être présenté à
 l'employeur une fois qu'une candidature/visio est en cours — jamais comme
 une annonce indépendante consultable par n'importe qui.
+
+> **Note d'implémentation (Sprint 4b)** : l'étape 9 (missions suggérées) ne
+> s'affiche pas dans le shell du wizard lui-même. La création du compte
+> (étapes 1-8) et de son profil se termine par une redirection complète vers
+> `/dashboard?onboarded=1`, où la 9ème étape apparaît comme un bandeau
+> "Missions suggérées" en tête du tableau de bord. Raison technique : la
+> route du wizard (`/dashboard/onboarding`) partage son layout avec
+> `/dashboard`, qui redirige hors de l'onboarding dès qu'un profil candidat
+> existe — un problème rencontré lors des tests de ce sprint, où toute
+> action serveur (y compris "Candidater" depuis l'étape 9) déclenchait cette
+> redirection avant que l'écran ne puisse s'afficher. Le résultat perçu par
+> le candidat reste le même (inscription → présentation immédiate de
+> missions pertinentes → candidature en un clic), seul l'écran qui l'affiche
+> a changé.
 
 ### Les 9 Étapes
 
@@ -381,7 +396,7 @@ une annonce indépendante consultable par n'importe qui.
 - Disponibilité immédiate
 
 **ÉTAPE 6 — Expérience et tarif**
-- Niveau d'expérience (débutant / intermédiaire / expérimenté)
+- Niveau d'expérience (débutant / 1-3 ans / 3-5 ans / 5 ans et plus)
 - Tarif horaire
 - Mention légale conditionnelle selon le statut (voir
   [Statut Candidat & Paiement](#statut-candidat--paiement)) :
@@ -398,7 +413,8 @@ une annonce indépendante consultable par n'importe qui.
 - Enrichit le profil affiché lors d'une candidature — ce n'est **pas** une
   annonce publique indépendante
 
-**ÉTAPE 9 — Missions suggérées**
+**ÉTAPE 9 — Missions suggérées** (bandeau sur `/dashboard`, voir note
+d'implémentation ci-dessus)
 - Pré-matching géographique immédiat juste après l'inscription (tri par
   distance à l'adresse renseignée à l'étape 1, dans le `radius_km` par
   défaut — voir [Matching Algorithm](#matching-algorithm))
@@ -409,23 +425,28 @@ Utilisé à l'étape 7 du wizard candidat, et repris côté employeur pour le
 sous-typage du besoin (voir
 [Onboarding Employeur](#onboarding-employeur--gestion-des-missions)).
 
+Table alignée sur le seed réel exécuté en base (`skill_taxonomy`, 71 tags,
+migration `20260829010000_sprint4b_skill_taxonomy_seed.sql`) — remplace la
+liste précédente, qui datait d'une passe documentaire antérieure et ne
+correspondait plus exactement aux tags livrés.
+
 | Catégorie | Tags |
 |---|---|
-| 🧹 Ménage / Repassage | Repassage, Nettoyage vitres, Nettoyage four, Rangement, Produits écologiques, Grand ménage saisonnier, Gestion du linge |
-| 🌿 Jardinage | Tonte pelouse, Taille haies, Désherbage, Plantation, Arrosage, Élagage, Entretien potager, Ramassage feuilles |
-| 🔧 Bricolage | Montage meubles, Petite plomberie, Petite électricité, Peinture, Pose étagères, Réparations diverses, Pose de rideaux |
-| 📦 Déménagement / Manutention | Emballage cartons, Port de charges lourdes, Montage/démontage meubles, Véhicule utilitaire, Manutention sans ascenseur |
-| 👶 Garde d'enfants | Aide aux devoirs, Sorties d'école, Activités créatives, Bain et coucher, Préparation repas enfant, Premiers secours pédiatriques, Bébés/nourrissons, Trajets scolaires |
-| 🐾 Garde d'animaux | Promenade chien, Alimentation, Soins de base, Pension à domicile, Toilettage léger, Nouveaux animaux de compagnie (NAC) |
-| 📚 Cours particuliers | Mathématiques, Français, Langues étrangères, Sciences, Méthodologie/organisation, Soutien primaire, Soutien collège/lycée, Préparation examens |
-| 👴 Aide personnes âgées | Aide aux repas, Aide à la toilette (non médicalisée), Compagnie/conversation, Accompagnement rendez-vous, Rappel de médicaments, Mobilité réduite, Gestes et postures |
-| 💻 Aide informatique / numérique | Initiation smartphone, Configuration ordinateur, Dépannage à distance, Réseaux sociaux, Démarches administratives en ligne, Sécurité numérique |
-| 🍳 Aide préparation repas | Cuisine quotidienne, Batch cooking, Régimes spécifiques, Pâtisserie, Cuisine pour enfants |
-| 📬 Courses / Livraison | Courses alimentaires, Livraison colis, Pharmacie, Gros achats/encombrants, Comparaison prix |
-| 🚗 Accompagnement véhiculé | Permis B, Véhicule personnel, Trajets médicaux, Trajets administratifs, Accompagnement mobilité réduite |
-| 🎄 Aide saisonnière | Déneigement, Préparation jardin hiver/été, Décoration saisonnière, Entretien piscine saisonnier |
-| 📸 Aide événementielle | Service à table, Aide à l'organisation, Rangement post-événement, Garde d'enfants événementielle, Animation |
-| 🏠 Surveillance domicile | Ouverture/fermeture volets, Arrosage plantes en votre absence, Relève courrier, Rondes de sécurité, Présence animaux |
+| 🧹 Ménage | Repassage, Cuisine/préparation repas, Rangement, Vitres, Nettoyage sols, Produits écologiques |
+| 🌿 Jardinage | Tonte, Taille de haies, Entretien massifs, Désherbage, Arrosage, Petit élagage |
+| 🔧 Bricolage | Petits travaux électriques, Plomberie de base, Montage meubles, Peinture, Pose d'étagères |
+| 📦 Déménagement | Port de charges lourdes, Emballage/cartons, Démontage/remontage meubles, Permis B |
+| 👶 Garde d'enfants | Nouveau-nés, Tout-petits, Âge préscolaire, Âge scolaire, Aide aux devoirs, Activités/Montessori, Premiers secours |
+| 🐾 Garde d'animaux | Chiens, Chats, NAC, Promenade, Administration médicaments, Toilettage de base |
+| 📚 Cours particuliers | Primaire, Collège, Lycée, Soutien méthodologie, Langues, Matières scientifiques |
+| 👴 Aide personnes âgées | Aide à la toilette, Aide au repas, Accompagnement sorties, Stimulation cognitive, Premiers secours |
+| 💻 Aide informatique | Initiation smartphone, Configuration ordinateur, Démarches en ligne, Dépannage de base |
+| 🍳 Préparation repas | Cuisine traditionnelle, Régimes spécifiques, Batch cooking, Pâtisserie |
+| 📬 Courses / Livraison | Motorisé, Grandes surfaces, Marchés, Pharmacie |
+| 🚗 Accompagnement véhiculé | Permis de conduire, Véhicule personnel, Trajets médicaux, Trajets scolaires |
+| 🎄 Aide saisonnière | Déneigement, Entretien extérieur hiver, Décorations saisonnières |
+| 📸 Aide événementielle | Service à table, Aide logistique, Garde d'enfants en événement |
+| 🏠 Surveillance domicile | Arrosage plantes, Relève courrier, Rondes de sécurité, Alimentation animaux |
 
 ---
 

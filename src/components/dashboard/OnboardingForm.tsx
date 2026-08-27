@@ -2,6 +2,11 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import CandidateOnboardingWizard from '@/components/dashboard/candidate-onboarding/CandidateOnboardingWizard'
+import type { Database } from '@/types/database.types'
+
+type ServiceCategory = Database['public']['Tables']['service_categories']['Row']
+type SkillTaxonomy = Database['public']['Tables']['skill_taxonomy']['Row']
 
 type AccountType = 'employer' | 'candidate'
 
@@ -11,12 +16,35 @@ interface OnboardingFormProps {
   fullName: string | null
   phone: string | null
   initialAccountType: AccountType | null
+  categories: ServiceCategory[]
+  skillTaxonomy: SkillTaxonomy[]
 }
 
-export default function OnboardingForm({ userId, email, fullName, phone, initialAccountType }: OnboardingFormProps) {
+export default function OnboardingForm({
+  userId,
+  email,
+  fullName,
+  phone,
+  initialAccountType,
+  categories,
+  skillTaxonomy,
+}: OnboardingFormProps) {
   const [accountType, setAccountType] = useState<AccountType | null>(initialAccountType)
+  const [showCandidateWizard, setShowCandidateWizard] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  if (showCandidateWizard) {
+    return (
+      <CandidateOnboardingWizard
+        email={email}
+        initialFullName={fullName}
+        initialPhone={phone}
+        categories={categories}
+        skillTaxonomy={skillTaxonomy}
+      />
+    )
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,6 +55,13 @@ export default function OnboardingForm({ userId, email, fullName, phone, initial
       return
     }
 
+    // Candidates get the full 9-step wizard instead of an immediate upsert —
+    // it handles creating profiles/candidate_profiles itself once complete.
+    if (accountType === 'candidate') {
+      setShowCandidateWizard(true)
+      return
+    }
+
     setLoading(true)
     try {
       const { error: profileError } = await supabase.from('profiles').upsert({
@@ -34,8 +69,8 @@ export default function OnboardingForm({ userId, email, fullName, phone, initial
         email,
         full_name: fullName,
         phone,
-        is_employer: accountType === 'employer',
-        is_candidate: accountType === 'candidate',
+        is_employer: true,
+        is_candidate: false,
         is_verified: false,
         verification_type: null,
         account_status: 'active',
@@ -43,37 +78,19 @@ export default function OnboardingForm({ userId, email, fullName, phone, initial
       })
       if (profileError) throw profileError
 
-      const { error: subProfileError } =
-        accountType === 'employer'
-          ? await supabase.from('employer_profiles').upsert(
-              {
-                user_id: userId,
-                company_name: null,
-                bio: null,
-                total_missions_posted: 0,
-                total_spent: 0,
-                rating: 0,
-                payment_verified: false,
-                stripe_customer_id: null,
-              },
-              { onConflict: 'user_id' }
-            )
-          : await supabase.from('candidate_profiles').upsert(
-              {
-                user_id: userId,
-                bio: null,
-                years_experience: null,
-                skills: null,
-                languages: null,
-                hourly_rate: null,
-                availability_status: 'available',
-                rating: 0,
-                total_missions_completed: 0,
-                response_rate: 0,
-                no_show_count: 0,
-              },
-              { onConflict: 'user_id' }
-            )
+      const { error: subProfileError } = await supabase.from('employer_profiles').upsert(
+        {
+          user_id: userId,
+          company_name: null,
+          bio: null,
+          total_missions_posted: 0,
+          total_spent: 0,
+          rating: 0,
+          payment_verified: false,
+          stripe_customer_id: null,
+        },
+        { onConflict: 'user_id' }
+      )
       if (subProfileError) throw subProfileError
 
       // Full navigation rather than router.push(): the dashboard layout reads

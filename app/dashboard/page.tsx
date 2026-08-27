@@ -1,10 +1,11 @@
 import { redirect } from 'next/navigation'
-import { getCurrentUser, getProfile } from '@/lib/dashboard-data'
+import { getCategories, getCurrentUser, getProfile, getSuggestedMissionsForCandidate } from '@/lib/dashboard-data'
 import EmployerDashboard from '@/components/dashboard/EmployerDashboard'
 import CandidateDashboard from '@/components/dashboard/CandidateDashboard'
+import SuggestedMissionsBanner from '@/components/dashboard/SuggestedMissionsBanner'
 
 interface DashboardPageProps {
-  searchParams: Promise<{ category?: string; created?: string; showAll?: string }>
+  searchParams: Promise<{ category?: string; created?: string; showAll?: string; onboarded?: string }>
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
@@ -21,8 +22,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const params = await searchParams
   const fullName = profile.full_name ?? profile.email
 
+  const showOnboardedBanner = params.onboarded === '1' && profile.is_candidate
+  const [suggestedMissions, categories] = showOnboardedBanner
+    ? await Promise.all([getSuggestedMissionsForCandidate(user.id), getCategories()])
+    : [[], []]
+
   return (
     <div className="flex flex-col gap-8">
+      {showOnboardedBanner && <SuggestedMissionsBanner missions={suggestedMissions} categories={categories} />}
+
       {params.created && (
         <div
           role="status"

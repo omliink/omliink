@@ -53,6 +53,17 @@ type CandidateProfilesRow = {
   total_missions_completed: number
   response_rate: number
   no_show_count: number
+  gender: string | null
+  birth_date: string | null
+  birth_place: string | null
+  native_language: string | null
+  phone_visible: boolean
+  photo_url: string
+  experience_level: string | null
+  bio_title: string | null
+  bio_text: string | null
+  verification_status: string
+  verification_document_url: string | null
   created_at: string
   updated_at: string
 }
@@ -76,10 +87,102 @@ type CandidateProfilesInsert = {
   total_missions_completed?: number
   response_rate?: number
   no_show_count?: number
+  gender?: string | null
+  birth_date?: string | null
+  birth_place?: string | null
+  native_language?: string | null
+  phone_visible?: boolean
+  photo_url?: string
+  experience_level?: string | null
+  bio_title?: string | null
+  bio_text?: string | null
+  verification_status?: string
+  verification_document_url?: string | null
   created_at?: string
   updated_at?: string
 }
 type CandidateProfilesUpdate = Partial<CandidateProfilesInsert>
+
+// --- skill_taxonomy ---
+type SkillTaxonomyRow = {
+  id: string
+  category_id: string
+  skill_tag: string
+  label: string
+  created_at: string
+}
+type SkillTaxonomyInsert = {
+  id?: string
+  category_id: string
+  skill_tag: string
+  label: string
+  created_at?: string
+}
+type SkillTaxonomyUpdate = Partial<SkillTaxonomyInsert>
+
+// --- candidate_languages ---
+type CandidateLanguagesRow = {
+  id: string
+  candidate_id: string
+  language: string
+  is_native: boolean
+  created_at: string
+}
+type CandidateLanguagesInsert = {
+  id?: string
+  candidate_id: string
+  language: string
+  is_native?: boolean
+  created_at?: string
+}
+type CandidateLanguagesUpdate = Partial<CandidateLanguagesInsert>
+
+// --- candidate_service_types ---
+type CandidateServiceTypesRow = {
+  id: string
+  candidate_id: string
+  category_id: string
+  created_at: string
+}
+type CandidateServiceTypesInsert = {
+  id?: string
+  candidate_id: string
+  category_id: string
+  created_at?: string
+}
+type CandidateServiceTypesUpdate = Partial<CandidateServiceTypesInsert>
+
+// --- candidate_supplements ---
+type CandidateSupplementsRow = {
+  id: string
+  candidate_id: string
+  supplement_code: string
+  created_at: string
+}
+type CandidateSupplementsInsert = {
+  id?: string
+  candidate_id: string
+  supplement_code: string
+  created_at?: string
+}
+type CandidateSupplementsUpdate = Partial<CandidateSupplementsInsert>
+
+// --- candidate_skills ---
+type CandidateSkillsRow = {
+  id: string
+  candidate_id: string
+  category_id: string
+  skill_tag: string
+  created_at: string
+}
+type CandidateSkillsInsert = {
+  id?: string
+  candidate_id: string
+  category_id: string
+  skill_tag: string
+  created_at?: string
+}
+type CandidateSkillsUpdate = Partial<CandidateSkillsInsert>
 
 // --- employer_profiles ---
 type EmployerProfilesRow = {
@@ -479,6 +582,36 @@ export interface Database {
         Row: ServiceCategoriesRow
         Insert: ServiceCategoriesInsert
         Update: ServiceCategoriesUpdate
+        Relationships: []
+      }
+      skill_taxonomy: {
+        Row: SkillTaxonomyRow
+        Insert: SkillTaxonomyInsert
+        Update: SkillTaxonomyUpdate
+        Relationships: []
+      }
+      candidate_languages: {
+        Row: CandidateLanguagesRow
+        Insert: CandidateLanguagesInsert
+        Update: CandidateLanguagesUpdate
+        Relationships: []
+      }
+      candidate_service_types: {
+        Row: CandidateServiceTypesRow
+        Insert: CandidateServiceTypesInsert
+        Update: CandidateServiceTypesUpdate
+        Relationships: []
+      }
+      candidate_supplements: {
+        Row: CandidateSupplementsRow
+        Insert: CandidateSupplementsInsert
+        Update: CandidateSupplementsUpdate
+        Relationships: []
+      }
+      candidate_skills: {
+        Row: CandidateSkillsRow
+        Insert: CandidateSkillsInsert
+        Update: CandidateSkillsUpdate
         Relationships: []
       }
       missions: { Row: MissionsRow; Insert: MissionsInsert; Update: MissionsUpdate; Relationships: [] }
