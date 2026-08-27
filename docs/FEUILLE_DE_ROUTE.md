@@ -12,11 +12,14 @@ SEMAINES 2-3 │ Phase 1: Foundation (DB, Auth, Landing)
 SEMAINES 4-6 │ Phase 2: Core Features (Missions, Matching géo, Chat)
 SEMAINES 7-8 │ Phase 3: Visio & Contrats
 SEMAINE   9  │ Phase 4: Statut Candidat & Paiements (Stripe Connect)
+   +4        │ Phase 4-BIS: Candidature/Visio + Onboarding + Premium (4a-4d)
 SEMAINE  10  │ Phase 5: Polish & Dashboards
 SEMAINE  11  │ Phase 6: Déploiement Production
 ```
 
-**Total:** 11 semaines = ~2.5 mois pour MVP complet
+**Total:** 11 semaines pour le MVP initial + 4 sprints supplémentaires
+(Phase 4-BIS, séquence 4a-4d) décidés après retour d'usage — non comptés
+dans l'estimation initiale de ~2.5 mois.
 
 ---
 
@@ -477,6 +480,127 @@ Stripe Connect pour le seul flux `auto_entrepreneur`
 
 ---
 
+## 🧭 PHASE 4-BIS — REFONTE CANDIDATURE, ONBOARDING & MONÉTISATION HYBRIDE
+
+Séquence de 4 sprints décidée après retour d'usage sur le MVP initial —
+prend le relais après le sprint Stripe Connect. Détail complet dans
+[CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md) (sections Workflow
+Candidature & Visio, Onboarding Candidat, Onboarding Employeur & Gestion
+des Missions, Modèle Économique) et
+[ARCHITECTURE_DATABASE.md](./ARCHITECTURE_DATABASE.md) pour le schéma
+cible. Comme d'habitude, les migrations Supabase réelles de chaque sprint
+sont créées et appliquées manuellement au moment du sprint — rien n'est
+exécuté par cette mise à jour de documentation.
+
+### Sprint 4a — Refonte Workflow Candidature/Visio
+
+**Objectif :** remplacer le statut binaire accepté/refusé par un vrai
+processus d'entretien (`pending` → `interviewing` → `hired`/`rejected`),
+avec plusieurs entretiens en parallèle possibles avant décision.
+
+**Tâches :**
+- [ ] Migration `applications.status` : réécriture des valeurs existantes
+      vers `pending`/`interviewing`/`hired`/`rejected`
+- [ ] La mission reste `published` tant qu'aucun candidat n'est `hired`
+- [ ] Nouvel onglet employeur "Entretiens" (candidats `interviewing`)
+- [ ] Action "Choisir ce candidat" : `hired` + rejet auto des autres +
+      génération contrat + mission → `assigned`
+
+**Deliverables :**
+- Migration `applications.status` (réécriture) ✅
+- Onglet "Entretiens" côté employeur ✅
+
+---
+
+### Sprint 4b — Onboarding Candidat (Wizard 9 étapes)
+
+**Objectif :** wizard d'inscription candidat en 9 étapes, adapté au
+modèle mission-first (pas de profil-vitrine public).
+
+**Tâches :**
+- [ ] Migration `candidate_profiles` : `gender`, `birth_date`,
+      `birth_place`, `native_language`, `phone_visible`, `photo_url`
+      (NOT NULL), `experience_level`, `bio_title`, `bio_text`,
+      `verification_status`, `verification_document_url`
+- [ ] Nouvelles tables : `candidate_languages`, `candidate_service_types`,
+      `candidate_supplements`, `skill_taxonomy`, `candidate_skills`
+- [ ] Seed `skill_taxonomy` (référentiel de tags par catégorie, voir
+      annexe CAHIER_DES_CHARGES.md)
+- [ ] Wizard 9 étapes : à propos / infos complémentaires / photo
+      (bloquant) / types de services / suppléments / expérience &
+      tarif / compétences / bio / missions suggérées
+- [ ] Vérification de profil : badge, upload pièce d'identité, revue
+      manuelle (pas d'automatisation)
+- [ ] Agenda candidat (visios et missions à venir)
+- [ ] Onglets candidatures "En attente" / "Historique"
+
+**Deliverables :**
+- Migration `candidate_profiles` + 5 nouvelles tables ✅
+- Wizard onboarding candidat (9 étapes) ✅
+- Page vérification de profil ✅
+- Agenda + onglets candidatures ✅
+
+---
+
+### Sprint 4c — Gestion Missions Employeur & Onboarding Enrichi
+
+**Objectif :** cycle de vie complet des missions côté employeur (voir,
+éditer, pause, réactivation) + onboarding employeur enrichi + suggestions
+de candidats.
+
+**Tâches :**
+- [ ] Migration `missions.status` : ajout de `paused`
+- [ ] Actions mission : Voir / Éditer / Mettre en pause / Réactiver
+- [ ] Onboarding employeur enrichi : nationalité, sous-typage du besoin
+      par catégorie (référentiel partagé avec les compétences candidat),
+      titre mission (10-60 car.), description (30-2000 car.), photo
+      optionnelle
+- [ ] Suggestions de candidats compatibles post-publication + invitation
+      à candidater (pas de contact direct libre)
+- [ ] Nouvel onglet employeur "Mes intervenants" (historique `hired`)
+
+**Deliverables :**
+- Migration `missions.status` (+`paused`) ✅
+- Actions pause/réactivation mission ✅
+- Onboarding employeur enrichi ✅
+- Onglet "Mes intervenants" ✅
+
+---
+
+### Sprint 4d — Abonnement Premium (Stripe Subscriptions + Codes Promo)
+
+**Objectif :** monétisation hybride — commission 10% (inchangée) +
+abonnement Premium employeur 10€/mois, sur un flux Stripe **distinct** du
+Checkout de paiement de mission.
+
+**Tâches :**
+- [ ] Migration `employer_profiles` : `subscription_tier`,
+      `subscription_status`, `stripe_subscription_id`
+- [ ] Nouvelle table `promo_codes`
+- [ ] Intégration Stripe Subscriptions (Billing) — distincte de Stripe
+      Connect/Checkout déjà en place
+- [ ] Webhooks : `invoice.paid`, `customer.subscription.updated`,
+      `customer.subscription.deleted`
+- [ ] Gratuit : 1-2 missions actives max ; Premium : illimité + priorité
+      matching + accompagnement URSSAF manuel + codes promo
+- [ ] Application d'un code promo au moment de la souscription
+
+**Deliverables :**
+- Migration `employer_profiles` + table `promo_codes` ✅
+- Flux Stripe Subscriptions (souscription, webhooks) ✅
+- Limite missions actives (gratuit vs Premium) ✅
+- Codes promo fonctionnels ✅
+
+---
+
+### Phase 4-BIS Summary
+- **Livrables :** Workflow entretien candidature + Onboarding candidat
+  (wizard 9 étapes) + Gestion missions employeur (pause/édition) +
+  Onboarding employeur enrichi + Abonnement Premium (Stripe Subscriptions)
+- **Status :** ⏳ À faire — prochaine séquence après le sprint Stripe Connect
+
+---
+
 ## 🎨 PHASE 5 — POLISH & DASHBOARDS (Semaine 10)
 
 ### Sprint 15: Profils & Settings
@@ -661,9 +785,10 @@ Stripe Connect pour le seul flux `auto_entrepreneur`
 | **2** | 4-6 | 125 | Core Features |
 | **3** | 7-8 | 55 | Visio + Contrats |
 | **4** | 9 | 50 | Statut Candidat + Paiements (Stripe Connect) |
+| **4-BIS** | +4 sprints | — | Candidature/Visio + Onboarding + Premium (4a-4d) |
 | **5** | 10 | 50 | Dashboards + Polish |
 | **6** | 11 | 40 | Production + Launch |
-| **TOTAL** | **11** | **435** | **MVP Complet** |
+| **TOTAL** | **11 + 4 sprints** | **435 +** | **MVP Complet + Phase 4-BIS** |
 
 ---
 
@@ -675,6 +800,7 @@ Fin Semaine 3:    ✅ Auth fonctionnelle + Landing
 Fin Semaine 6:    ✅ Core features (Missions + Matching géo + Chat)
 Fin Semaine 8:    ✅ Visio + Contrats
 Fin Semaine 9:    ✅ Statut Candidat + Paiements (Stripe Connect)
+Fin Sprint 4a-4d: ⏳ Candidature/Visio + Onboarding + Premium (à faire)
 Fin Semaine 10:   ✅ Dashboards + Polish
 Fin Semaine 11:   🚀 Production Launch
 ```

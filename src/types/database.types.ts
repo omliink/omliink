@@ -182,6 +182,7 @@ type MissionsUpdate = Partial<MissionsInsert>
 type VisioMeetingsRow = {
   id: string
   mission_id: string
+  application_id: string | null
   employer_id: string
   candidate_id: string
   room_name: string
@@ -204,6 +205,7 @@ type VisioMeetingsRow = {
 type VisioMeetingsInsert = {
   id?: string
   mission_id: string
+  application_id?: string | null
   employer_id: string
   candidate_id: string
   room_name: string

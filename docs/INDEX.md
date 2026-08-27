@@ -26,12 +26,15 @@ Lire en DEUXIÈME (30 min)
 ├─ Concept & Vision
 ├─ Services proposés (15 catégories)
 ├─ Architecture technique
-├─ Modèle économique
-├─ Système visio
+├─ Modèle économique (hybride : commission + Premium)
+├─ Workflow candidature & visio (entretiens)
+├─ Onboarding candidat (wizard 9 étapes)
+├─ Onboarding employeur & gestion des missions
 ├─ Vérification candidats
 ├─ Statut candidat & paiement
 ├─ Matching algorithm (géographique, scope MVP)
-└─ Design system
+├─ Design system
+└─ Ce qui est explicitement écarté
 ```
 **Placement:** `/docs/CAHIER_DES_CHARGES.md` ou `/CAHIER_DES_CHARGES.md`  
 **Quand l'utiliser:** Comprendre le projet en profondeur, valider requirements
@@ -41,7 +44,7 @@ Lire en DEUXIÈME (30 min)
 ### 3️⃣ **ARCHITECTURE_DATABASE.md** — Schéma PostgreSQL
 ```
 Lire en TROISIÈME (20 min)
-├─ 18 tables principales
+├─ 18 tables principales (MVP) + 6 tables cibles Sprint 4a-4d
 ├─ Migrations SQL
 ├─ RLS Policies
 ├─ Indexes performance
@@ -56,7 +59,7 @@ Lire en TROISIÈME (20 min)
 ### 4️⃣ **FEUILLE_DE_ROUTE.md** — Timeline du Projet
 ```
 Lire en QUATRIÈME (15 min)
-├─ 6 phases (0-6)
+├─ 6 phases (0-6) + Phase 4-BIS (Sprints 4a-4d, post-MVP)
 ├─ 20 sprints détaillés
 ├─ Jalons clés
 ├─ KPIs progression
@@ -70,7 +73,7 @@ Lire en QUATRIÈME (15 min)
 ### 5️⃣ **SPRINTS.md** — Détail des Sprints
 ```
 Lire en DERNIER (30 min par sprint)
-├─ Sprint 0-20 détaillés
+├─ Sprint 0-20 détaillés + Sprints 4a-4d (post-MVP)
 ├─ Tâches par jour
 ├─ Claude Code Prompts
 ├─ Deliverables par sprint

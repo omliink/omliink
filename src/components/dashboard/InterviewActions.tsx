@@ -1,28 +1,26 @@
 'use client'
 
 import { useTransition } from 'react'
-import { startInterview, rejectApplication } from '@/lib/actions/applications'
+import { chooseCandidate } from '@/lib/actions/hiring'
+import { rejectApplication } from '@/lib/actions/applications'
 
-interface ApplicationActionsProps {
+interface InterviewActionsProps {
   applicationId: string
   missionId: string
-  status: string
 }
 
-export default function ApplicationActions({ applicationId, missionId, status }: ApplicationActionsProps) {
+export default function InterviewActions({ applicationId, missionId }: InterviewActionsProps) {
   const [isPending, startTransition] = useTransition()
-
-  if (status !== 'pending') return null
 
   return (
     <div className="flex gap-2">
       <button
         type="button"
         disabled={isPending}
-        onClick={() => startTransition(() => startInterview(applicationId, missionId))}
-        className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
+        onClick={() => startTransition(() => chooseCandidate(applicationId, missionId))}
+        className="rounded-lg bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        Passer en entretien
+        Choisir ce candidat
       </button>
       <button
         type="button"
@@ -30,7 +28,7 @@ export default function ApplicationActions({ applicationId, missionId, status }:
         onClick={() => startTransition(() => rejectApplication(applicationId, missionId))}
         className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        Refuser
+        Écarter ce candidat
       </button>
     </div>
   )

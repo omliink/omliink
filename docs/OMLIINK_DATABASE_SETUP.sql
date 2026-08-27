@@ -1,6 +1,13 @@
 -- ========================================
 -- OMLIINK DATABASE SETUP
--- 18 Tables + RLS + Indexes + Triggers
+-- 25 Tables + RLS + Indexes + Triggers
+-- (19 tables MVP initial (18 "core" + favorite_candidates en bonus) +
+--  6 tables Sprint 4a-4d — voir ARCHITECTURE_DATABASE.md pour le détail
+--  par sprint)
+--
+-- ⚠️ Fichier de référence du schéma CIBLE — pas une migration à exécuter.
+-- Les migrations Supabase réelles sont créées et appliquées manuellement,
+-- sprint par sprint, dans supabase/migrations/.
 -- ========================================
 
 -- Enable extensions
@@ -47,6 +54,21 @@ CREATE TABLE candidate_profiles (
   total_missions_completed INTEGER DEFAULT 0,
   response_rate DECIMAL(5, 2) DEFAULT 0,
   no_show_count INTEGER DEFAULT 0,
+
+  -- Onboarding candidat wizard 9 étapes (Sprint 4b)
+  gender VARCHAR(50),                       -- étape 1
+  birth_date DATE,                          -- étape 2
+  birth_place VARCHAR(255),                 -- étape 2
+  native_language VARCHAR(100),             -- étape 2
+  phone_visible BOOLEAN DEFAULT FALSE,      -- étape 2
+  photo_url TEXT NOT NULL,                  -- étape 3, OBLIGATOIRE (bloquant)
+  experience_level VARCHAR(50),             -- étape 6: 'debutant', 'intermediaire', 'experimente'
+  bio_title VARCHAR(255),                   -- étape 8
+  bio_text TEXT,                            -- étape 8
+  verification_status VARCHAR(50) DEFAULT 'not_submitted',
+  -- 'not_submitted', 'pending', 'verified', 'rejected'
+  verification_document_url TEXT,           -- pièce d'identité uploadée
+
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(user_id)
@@ -69,6 +91,14 @@ CREATE TABLE employer_profiles (
   rating DECIMAL(3, 2) DEFAULT 0,
   payment_verified BOOLEAN DEFAULT FALSE,
   stripe_customer_id VARCHAR(255),
+
+  -- Abonnement Premium (Sprint 4d) — Stripe Subscriptions, distinct du
+  -- Stripe Checkout des paiements de mission
+  subscription_tier VARCHAR(50) DEFAULT 'free', -- 'free', 'premium'
+  subscription_status VARCHAR(50) DEFAULT 'inactive',
+  -- 'inactive', 'active', 'past_due', 'canceled'
+  stripe_subscription_id VARCHAR(255),
+
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(user_id)
@@ -107,7 +137,8 @@ CREATE TABLE missions (
   location_address VARCHAR(500),
   location_lat DECIMAL(10, 8),
   location_lng DECIMAL(11, 8),
-  status VARCHAR(50) DEFAULT 'draft', -- 'draft', 'published', 'matching', 'visio_scheduled', 'assigned', 'in_progress', 'completed', 'cancelled', 'disputed'
+  status VARCHAR(50) DEFAULT 'draft', -- 'draft', 'published', 'paused', 'matching', 'visio_scheduled', 'assigned', 'in_progress', 'completed', 'cancelled', 'disputed'
+  -- 'paused' ajouté Sprint 4c : mise en pause manuelle par l'employeur
   mission_date DATE,
   mission_time_start TIME,
   mission_time_end TIME,
@@ -209,7 +240,11 @@ CREATE TABLE applications (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   mission_id UUID NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
   candidate_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  status VARCHAR(50) DEFAULT 'pending', -- 'pending', 'viewed', 'accepted', 'rejected', 'withdrawn'
+  status VARCHAR(50) DEFAULT 'pending',
+  -- Sprint 4a: 'pending', 'interviewing', 'hired', 'rejected'
+  -- 'interviewing': plusieurs candidatures peuvent l'être EN MEME TEMPS
+  --   sur une même mission (entretiens en parallèle) ; 'hired': un seul
+  --   candidat par mission, rejet automatique des autres candidatures
   cover_letter TEXT,
   proposed_rate DECIMAL(10, 2),
   applied_at TIMESTAMP DEFAULT NOW(),
@@ -439,6 +474,112 @@ CREATE POLICY "Employers can manage their favorites"
   ON favorite_candidates FOR ALL USING (employer_id = auth.uid());
 
 -- ========================================
+-- 19. SKILL_TAXONOMY (Sprint 4b — référentiel, pas de RLS candidat)
+-- ========================================
+CREATE TABLE skill_taxonomy (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category_id UUID NOT NULL REFERENCES service_categories(id),
+  tag VARCHAR(255) NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(category_id, tag)
+);
+
+ALTER TABLE skill_taxonomy ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Everyone can view skill taxonomy"
+  ON skill_taxonomy FOR SELECT USING (TRUE);
+
+-- ========================================
+-- 20. CANDIDATE_LANGUAGES (Sprint 4b — wizard étape 2)
+-- ========================================
+CREATE TABLE candidate_languages (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+  language VARCHAR(100) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(candidate_id, language)
+);
+
+ALTER TABLE candidate_languages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Candidates can manage their own languages"
+  ON candidate_languages FOR ALL USING (candidate_id = auth.uid());
+
+-- ========================================
+-- 21. CANDIDATE_SERVICE_TYPES (Sprint 4b — wizard étape 4)
+-- ========================================
+CREATE TABLE candidate_service_types (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+  category_id UUID NOT NULL REFERENCES service_categories(id),
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(candidate_id, category_id)
+);
+
+ALTER TABLE candidate_service_types ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Candidates can manage their own service types"
+  ON candidate_service_types FOR ALL USING (candidate_id = auth.uid());
+CREATE POLICY "Everyone can view candidate service types"
+  ON candidate_service_types FOR SELECT USING (TRUE);
+
+-- ========================================
+-- 22. CANDIDATE_SUPPLEMENTS (Sprint 4b — wizard étape 5)
+-- ========================================
+CREATE TABLE candidate_supplements (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+  supplement VARCHAR(100) NOT NULL,
+  -- 'first_aid', 'has_vehicle', 'driving_license', 'immediate_availability'
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(candidate_id, supplement)
+);
+
+ALTER TABLE candidate_supplements ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Candidates can manage their own supplements"
+  ON candidate_supplements FOR ALL USING (candidate_id = auth.uid());
+CREATE POLICY "Everyone can view candidate supplements"
+  ON candidate_supplements FOR SELECT USING (TRUE);
+
+-- ========================================
+-- 23. CANDIDATE_SKILLS (Sprint 4b — wizard étape 7)
+-- ========================================
+CREATE TABLE candidate_skills (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+  skill_id UUID NOT NULL REFERENCES skill_taxonomy(id),
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(candidate_id, skill_id)
+);
+
+ALTER TABLE candidate_skills ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Candidates can manage their own skills"
+  ON candidate_skills FOR ALL USING (candidate_id = auth.uid());
+CREATE POLICY "Everyone can view candidate skills"
+  ON candidate_skills FOR SELECT USING (TRUE);
+
+-- ========================================
+-- 24. PROMO_CODES (Sprint 4d — abonnement Premium)
+-- ========================================
+CREATE TABLE promo_codes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  code VARCHAR(100) UNIQUE NOT NULL,
+  discount_type VARCHAR(50) NOT NULL, -- 'percentage', 'fixed_amount'
+  discount_value DECIMAL(10, 2) NOT NULL,
+  valid_from TIMESTAMP NOT NULL DEFAULT NOW(),
+  valid_until TIMESTAMP,
+  max_uses INTEGER, -- NULL = illimité
+  current_uses INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+ALTER TABLE promo_codes ENABLE ROW LEVEL SECURITY;
+-- Pas de policy SELECT publique : les codes promo sont validés côté
+-- serveur (Server Action / Edge Function), jamais lus directement par le
+-- client. Voir CAHIER_DES_CHARGES.md → Modèle Économique, Sprint 4d.
+
+CREATE INDEX idx_promo_codes_code ON promo_codes(code);
+
+-- ========================================
 -- TRIGGERS for updated_at
 -- ========================================
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -492,8 +633,12 @@ CREATE TRIGGER notifications_updated_at BEFORE UPDATE ON notifications
 CREATE TRIGGER reports_updated_at BEFORE UPDATE ON reports
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER promo_codes_updated_at BEFORE UPDATE ON promo_codes
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ========================================
 -- DONE
 -- ========================================
 -- Database setup complete!
--- All 18 tables created with RLS, indexes, and triggers.
+-- All 25 tables created with RLS, indexes, and triggers
+-- (19 tables MVP initial + 6 tables Sprint 4a-4d).

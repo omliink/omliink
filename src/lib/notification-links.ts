@@ -4,6 +4,8 @@ export function getNotificationHref(type: string | null, relatedId: string | nul
   if (
     type === 'application_received' ||
     type === 'application_accepted' ||
+    type === 'application_interviewing' ||
+    type === 'application_hired' ||
     type === 'application_rejected' ||
     type === 'visio_proposed' ||
     type === 'visio_accepted' ||

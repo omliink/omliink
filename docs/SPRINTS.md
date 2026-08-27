@@ -30,6 +30,11 @@ SPRINT 17 │ Polish (Semaine 10-11)
 SPRINT 18 │ Production (Semaine 11)
 SPRINT 19 │ Testing (Semaine 11)
 SPRINT 20 │ Launch (Semaine 11)
+─────────────────────────────────────────────────────
+SPRINT 4a │ Refonte Workflow Candidature/Visio (post-MVP)
+SPRINT 4b │ Onboarding Candidat — Wizard 9 étapes (post-MVP)
+SPRINT 4c │ Gestion Missions Employeur & Onboarding Enrichi (post-MVP)
+SPRINT 4d │ Abonnement Premium (Stripe Subscriptions + Promo) (post-MVP)
 ```
 
 ---
@@ -429,6 +434,38 @@ git merge develop main  # Phase 1 stable
 
 ---
 
+## 🧭 SPRINTS 4a-4d — Refonte Candidature, Onboarding & Monétisation Hybride
+
+Séquence post-MVP décidée après retour d'usage (Phase 4-BIS dans
+[FEUILLE_DE_ROUTE.md](./FEUILLE_DE_ROUTE.md) — tâches complètes,
+deliverables et migrations détaillées là-bas ; détail fonctionnel dans
+[CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md)). Suit le même
+[Format Standard](#format-standard-pour-sprints-4-20) que les sprints
+4-20 ci-dessous.
+
+```
+SPRINT 4a │ Refonte Workflow Candidature/Visio
+          │ Objectif : pending/interviewing/hired/rejected, entretiens
+          │            en parallèle, onglet "Entretiens" employeur
+
+SPRINT 4b │ Onboarding Candidat — Wizard 9 étapes
+          │ Objectif : wizard complet (photo obligatoire, compétences par
+          │            catégorie, missions suggérées), vérification de
+          │            profil, agenda, onglets candidatures
+
+SPRINT 4c │ Gestion Missions Employeur & Onboarding Enrichi
+          │ Objectif : pause/réactivation mission, onboarding employeur
+          │            enrichi, suggestions candidats + invitation,
+          │            onglet "Mes intervenants"
+
+SPRINT 4d │ Abonnement Premium
+          │ Objectif : Stripe Subscriptions (distinct de Stripe Connect),
+          │            10€/mois, missions illimitées + priorité matching
+          │            + accompagnement URSSAF manuel, codes promo
+```
+
+---
+
 ## 📝 Format Standard pour Sprints 4-20
 
 ### Pour chaque sprint suivant:
@@ -529,8 +566,9 @@ Build Time: < 30s
 
 ---
 
-**Total Sprints:** 20  
-**Total Heures:** ~435h (11 semaines)  
-**Livrable:** OMLIINK MVP en production
+**Total Sprints:** 20 (MVP initial) + 4 (Sprints 4a-4d, post-MVP)  
+**Total Heures:** ~435h (11 semaines) + Phase 4-BIS  
+**Livrable:** OMLIINK MVP en production, puis refonte candidature/onboarding
++ monétisation hybride
 
 Voir FEUILLE_DE_ROUTE.md pour vue complète.

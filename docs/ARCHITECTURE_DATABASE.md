@@ -9,7 +9,7 @@
 1. [Vue d'Ensemble](#vue-densemble)
 2. [Tables Principales](#tables-principales)
 3. [Tables de Liaison](#tables-de-liaison)
-4. [Migrations SQL](#migrations-sql)
+4. [Migrations SQL](#migrations)
 5. [RLS Policies](#rls-policies)
 6. [Indexes Performance](#indexes-performance)
 7. [Triggers](#triggers)
@@ -54,6 +54,14 @@ Avis & Signalements (2):
 Autres (1):
   - documents
 ```
+
+> 🆕 **Schéma cible post Sprint 4a-4d** (+6 tables, voir détail dans
+> chaque section concernée) :
+> `candidate_languages`, `candidate_service_types`, `candidate_supplements`,
+> `skill_taxonomy`, `candidate_skills` (Sprint 4b — onboarding candidat),
+> `promo_codes` (Sprint 4d — abonnement Premium). Non créées à ce stade —
+> migrations réelles créées et appliquées manuellement sprint par sprint,
+> voir [Migrations](#migrations).
 
 ---
 
@@ -235,6 +243,87 @@ candidat voit les missions triées/filtrées par distance à sa position, dans
 son rayon d'action ; (2) l'employeur voit, sur chaque candidature reçue, la
 distance entre le candidat et le lieu de la mission.
 
+#### Champs cibles — Sprint 4b (onboarding candidat, wizard 9 étapes)
+
+Schéma cible après Sprint 4b — migrations réelles créées et appliquées
+manuellement au moment de ce sprint, pas maintenant (voir
+[Migrations](#migrations)) :
+
+```sql
+gender                     TEXT             -- étape 1
+birth_date                 DATE             -- étape 2
+birth_place                TEXT             -- étape 2
+native_language             TEXT             -- étape 2 (langue natale ;
+                                             --   langues additionnelles
+                                             --   via candidate_languages)
+phone_visible               BOOLEAN DEFAULT FALSE -- étape 2
+photo_url                   TEXT NOT NULL    -- étape 3, OBLIGATOIRE (bloquant)
+experience_level             TEXT             -- étape 6 : 'debutant',
+                                             --   'intermediaire', 'experimente'
+bio_title                   TEXT             -- étape 8
+bio_text                   TEXT             -- étape 8
+verification_status         TEXT DEFAULT 'not_submitted'
+                                             -- 'not_submitted', 'pending',
+                                             --   'verified', 'rejected'
+verification_document_url    TEXT             -- pièce d'identité uploadée
+```
+
+> ⚠️ `photo_url` est `NOT NULL` côté cible : l'étape 3 du wizard est
+> bloquante (pas de bouton "ignorer"), donc aucune ligne `candidate_profiles`
+> ne devrait exister sans photo une fois Sprint 4b en place.
+
+#### Nouvelles tables associées — Sprint 4b
+
+```sql
+-- Langues supplémentaires parlées (au-delà de native_language)
+CREATE TABLE candidate_languages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+  language TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(candidate_id, language)
+);
+
+-- Types de services sélectionnés à l'étape 4 (multi-select 15 catégories)
+CREATE TABLE candidate_service_types (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+  category_id UUID NOT NULL REFERENCES service_categories(id),
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(candidate_id, category_id)
+);
+
+-- Suppléments étape 5 (premiers secours, motorisé, permis, dispo immédiate)
+CREATE TABLE candidate_supplements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+  supplement TEXT NOT NULL,
+  -- 'first_aid', 'has_vehicle', 'driving_license', 'immediate_availability'
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(candidate_id, supplement)
+);
+
+-- Référentiel des tags de compétences par catégorie (voir annexe
+-- CAHIER_DES_CHARGES.md → Onboarding Candidat)
+CREATE TABLE skill_taxonomy (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  category_id UUID NOT NULL REFERENCES service_categories(id),
+  tag TEXT NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(category_id, tag)
+);
+
+-- Compétences choisies par le candidat à l'étape 7, parmi skill_taxonomy
+CREATE TABLE candidate_skills (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_id) ON DELETE CASCADE,
+  skill_id UUID NOT NULL REFERENCES skill_taxonomy(id),
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(candidate_id, skill_id)
+);
+```
+
 ---
 
 ### 3. `employer_profiles`
@@ -274,11 +363,40 @@ CREATE TABLE employer_profiles (
   -- Préférences
   requires_visio_before_hiring BOOLEAN DEFAULT FALSE,
   
+  -- Abonnement Premium (Sprint 4d — voir CAHIER_DES_CHARGES.md → Modèle
+  -- Économique). Distinct du flux Stripe Checkout des paiements de
+  -- mission : géré via Stripe Subscriptions (Billing).
+  subscription_tier TEXT DEFAULT 'free', -- 'free', 'premium'
+  subscription_status TEXT DEFAULT 'inactive',
+  -- 'inactive', 'active', 'past_due', 'canceled'
+  -- (reflète les événements webhook customer.subscription.updated/deleted)
+  stripe_subscription_id TEXT,
+  
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX idx_employer_profiles_user_id ON employer_profiles(user_id);
+```
+
+#### Nouvelle table associée — Sprint 4d
+
+```sql
+-- Codes promo réutilisables pour campagnes marketing (abonnement Premium)
+CREATE TABLE promo_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT UNIQUE NOT NULL,
+  discount_type TEXT NOT NULL, -- 'percentage', 'fixed_amount'
+  discount_value DECIMAL(10, 2) NOT NULL,
+  valid_from TIMESTAMP NOT NULL DEFAULT NOW(),
+  valid_until TIMESTAMP,
+  max_uses INTEGER, -- NULL = illimité
+  current_uses INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_promo_codes_code ON promo_codes(code);
 ```
 
 ---
@@ -369,8 +487,10 @@ CREATE TABLE missions (
   
   -- Status
   status TEXT DEFAULT 'draft',
-  -- 'draft', 'published', 'matching', 'visio_scheduled', 'assigned',
-  -- 'in_progress', 'completed', 'cancelled', 'disputed'
+  -- 'draft', 'published', 'paused', 'matching', 'visio_scheduled',
+  -- 'assigned', 'in_progress', 'completed', 'cancelled', 'disputed'
+  -- 'paused' ajouté Sprint 4c : mise en pause manuelle par l'employeur
+  -- (Voir Onboarding Employeur & Gestion des Missions, CAHIER_DES_CHARGES.md)
   assigned_candidate_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   
   -- Candidatures
@@ -490,10 +610,17 @@ CREATE TABLE applications (
   message TEXT,
   proposed_rate DECIMAL(7, 2),
   
-  -- Status
+  -- Status (Sprint 4a : refonte du workflow candidature/entretien)
   status TEXT DEFAULT 'pending',
-  -- 'pending', 'visio_proposed', 'visio_scheduled', 'visio_completed',
-  -- 'accepted', 'rejected', 'withdrawn', 'expired'
+  -- 'pending'      : candidature envoyée, pas encore d'entretien
+  -- 'interviewing' : au moins une visio programmée/réalisée — PLUSIEURS
+  --                  candidatures peuvent être 'interviewing' EN MÊME
+  --                  TEMPS sur une même mission (entretiens en parallèle)
+  -- 'hired'        : candidat retenu pour la mission (un seul par mission)
+  -- 'rejected'     : non retenu (manuel, ou auto dès qu'un autre candidat
+  --                  passe à 'hired')
+  -- Remplace l'ancien enum 'accepted'/'withdrawn'/'expired' — voir
+  -- CAHIER_DES_CHARGES.md → Workflow Candidature & Visio
   
   -- Matching
   match_score DECIMAL(5, 2),
@@ -1102,6 +1229,33 @@ alter table public.candidate_profiles
   add column if not exists location_lng double precision,
   add column if not exists radius_km integer not null default 20;
 ```
+
+### Migrations — Sprints 4a-4d (pas maintenant)
+
+Cette mise à jour de documentation ne crée **aucune migration réelle**.
+Comme pour les sprints précédents, les migrations SQL seront rédigées et
+appliquées manuellement au moment de chacun des sprints suivants (voir
+[FEUILLE_DE_ROUTE.md](./FEUILLE_DE_ROUTE.md) et
+[SPRINTS.md](./SPRINTS.md)) :
+
+```
+Sprint 4a → réécriture des valeurs applications.status
+            (pending/interviewing/hired/rejected)
+Sprint 4b → colonnes candidate_profiles (gender, birth_date, birth_place,
+            native_language, phone_visible, photo_url, experience_level,
+            bio_title, bio_text, verification_status,
+            verification_document_url) + tables candidate_languages,
+            candidate_service_types, candidate_supplements,
+            skill_taxonomy, candidate_skills
+Sprint 4c → ajout du statut 'paused' sur missions
+Sprint 4d → colonnes employer_profiles (subscription_tier,
+            subscription_status, stripe_subscription_id) + table
+            promo_codes
+```
+
+`OMLIINK_DATABASE_SETUP.sql` (racine `docs/`) a été mis à jour en
+parallèle pour refléter ce schéma cible dans son ensemble — c'est un
+fichier de référence, pas une migration à exécuter.
 
 ---
 

@@ -12,12 +12,15 @@
 2. [Services Proposés](#services-proposés)
 3. [Architecture Technique](#architecture-technique)
 4. [Modèle Économique](#modèle-économique)
-5. [Système Visio](#système-visio)
-6. [Vérification Candidats](#vérification-candidats)
-7. [Statut Candidat & Paiement](#statut-candidat--paiement)
-8. [Matching Algorithm](#matching-algorithm)
-9. [Design System](#design-system)
-10. [Contraintes & Règles](#contraintes--règles)
+5. [Workflow Candidature & Visio](#workflow-candidature--visio)
+6. [Onboarding Candidat](#onboarding-candidat)
+7. [Onboarding Employeur & Gestion des Missions](#onboarding-employeur--gestion-des-missions)
+8. [Vérification Candidats](#vérification-candidats)
+9. [Statut Candidat & Paiement](#statut-candidat--paiement)
+10. [Matching Algorithm](#matching-algorithm)
+11. [Design System](#design-system)
+12. [Contraintes & Règles](#contraintes--règles)
+13. [Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté)
 
 ---
 
@@ -146,40 +149,72 @@ l'argent.
   le plus proche du besoin réel de nombreux employeurs (emploi déclaré
   classique)
 
-### Roadmap monétisation future (hors scope du sprint actuel)
+### Sprint 4d — Abonnement Premium employeur (planifié)
+
+Décision : passer d'un modèle purement transactionnel à un modèle
+**hybride** — la commission 10% reste le revenu principal, l'abonnement
+Premium devient un revenu secondaire, activement planifié (Sprint 4d),
+pas une simple piste future.
+
+**Abonnement Premium — 10€/mois fixe**
+- Missions actives illimitées en simultané (**gratuit : limité à 1-2
+  missions actives**)
+- Mise en avant / priorité dans le matching candidat
+- Accompagnement URSSAF (déclaration, CESU/Pajemploi) — **manuel pour
+  l'instant**, assuré par l'équipe OMLIINK sur demande. **Pas d'intégration
+  API automatisée à ce stade** (roadmap future distincte, voir
+  [Statut Candidat & Paiement](#statut-candidat--paiement) sur le pilote
+  URSSAF plateformes)
+- Système de **codes promo** réutilisables pour campagnes marketing
+  (`promo_codes` : code, type de remise, valeur, validité, plafond
+  d'utilisations — voir ARCHITECTURE_DATABASE.md)
+
+> ⚠️ Le Premium ne donne **jamais** accès à un contact direct libre des
+> candidats ni à un profil-vitrine public — voir
+> [Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté). Les
+> seuls bénéfices sont : volume de missions, priorité de matching,
+> accompagnement URSSAF manuel, codes promo.
+
+**Infrastructure de paiement — deux flux Stripe distincts**
+```
+Stripe Checkout  → paiement ponctuel de mission (auto-entrepreneur, déjà
+                    en place, Sprint Stripe Connect)
+Stripe Subscriptions (Billing) → abonnement Premium récurrent (nouveau,
+                    Sprint 4d)
+                    Webhooks : invoice.paid,
+                               customer.subscription.updated,
+                               customer.subscription.deleted
+```
+Les deux flux sont volontairement séparés : le Checkout à usage unique
+gère le paiement de mission avec `application_fee_amount` + `transfer_data`
+vers le compte Connect du candidat ; les Subscriptions gèrent uniquement la
+relation d'abonnement employeur ↔ OMLIINK (pas de split, pas de compte
+Connect impliqué).
+
+### Roadmap monétisation future (hors scope, au-delà de Sprint 4d)
 
 À explorer une fois qu'on aura du recul sur l'usage réel — volume de
 missions, taux de conversion candidat `auto_entrepreneur` vs
-`particulier_employeur`. Rien ci-dessous n'est engagé ou construit
-aujourd'hui.
-
-**Options premium employeur** (inspiré du modèle Yoopies : *"Options
-premium payantes — Mise en avant des annonces, Contacts illimités, Accès
-aux numéros de téléphone"*)
-- Mise en avant d'annonce
-- Accès prioritaire ou illimité aux profils candidats
-- Contacts illimités
-
-**Abonnement mensuel employeur** (usage récurrent)
-- À évaluer séparément — nécessite un produit Stripe différent (**Stripe
-  Billing / Subscriptions**, distinct de **Stripe Connect** utilisé pour la
-  commission auto-entrepreneur)
-- Volontairement non mélangé avec le sprint paiement actuel pour éviter
-  d'ajouter de la complexité avant d'avoir validé le flux de base
+`particulier_employeur`, taux de conversion Premium. Rien ci-dessous n'est
+engagé ou construit à ce stade.
 
 **Autres leviers non engagés**
-- Boost de visibilité candidat dans le matching
+- Boost de visibilité candidat dans le matching (distinct de la priorité
+  de matching déjà incluse dans le Premium employeur ci-dessus)
 - Partenariats (CE / CESU préfinancés, assurances responsabilité civile,
   formations professionnelles)
+- Intégration URSSAF/CESU API automatisée (voir
+  [Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté))
 
 **Objectif affiché** : faire au moins aussi bien que Yoopies sur
-l'acquisition (gratuité d'entrée), tout en gardant plusieurs leviers de
-revenus futurs ouverts et non engagés prématurément.
+l'acquisition (gratuité d'entrée pour la publication de mission), tout en
+gardant plusieurs leviers de revenus futurs ouverts et non engagés
+prématurément.
 
 > ⚠️ Ce choix de monétisation sera réévalué à la lumière de données d'usage
 > réelles (volume de missions publiées, taux de conversion
-> `auto_entrepreneur` vs `particulier_employeur`) plutôt que figé
-> définitivement maintenant.
+> `auto_entrepreneur` vs `particulier_employeur`, adoption du Premium)
+> plutôt que figé définitivement maintenant.
 
 ### Projection Financière — vision long terme (pas la réalité du MVP actuel)
 
@@ -211,9 +246,56 @@ Coûts: 150€
 
 ---
 
-## 📹 Système Visioconférence
+## 📋 Workflow Candidature & Visio
 
-### Flux Complet
+Décision Sprint 4a : passage d'un modèle "un clic accepte/rejette" à un
+véritable processus d'entretien. Plusieurs candidats peuvent être en
+entretien (visio) en parallèle sur une même mission avant toute décision
+finale.
+
+### Statuts `applications.status`
+
+```
+pending       → candidature envoyée, pas encore d'entretien programmé
+interviewing  → au moins une visio programmée ou réalisée avec ce candidat
+                (plusieurs candidatures peuvent être 'interviewing' EN
+                MÊME TEMPS sur une même mission — plusieurs entretiens
+                possibles avant décision)
+hired         → candidat retenu pour la mission (un seul par mission)
+rejected      → candidat non retenu (manuel, ou automatique dès qu'un
+                autre candidat passe à 'hired')
+```
+
+> ⚠️ Remplace l'ancien statut `accepted`. Voir
+> [ARCHITECTURE_DATABASE.md](./ARCHITECTURE_DATABASE.md) pour la migration
+> de réécriture des valeurs existantes.
+
+### Règle sur le statut de la mission
+
+```
+✅ La mission reste 'published' tant qu'aucun candidat n'est 'hired'
+✅ Plusieurs entretiens (visio) peuvent avoir lieu en parallèle, avec des
+   candidats différents, avant toute décision
+✅ La mission ne passe à 'assigned' qu'au moment de l'embauche effective
+✅ La mission peut aussi être mise en 'paused' par l'employeur à tout
+   moment avant embauche — voir Onboarding Employeur & Gestion des Missions
+```
+
+### Nouvel onglet employeur — "Entretiens"
+
+Liste tous les candidats actuellement `interviewing` sur la mission (visio
+programmée ou déjà réalisée), avec accès à leur profil complet et à
+l'historique de la visio.
+
+**Action "Choisir ce candidat"** (déclenchée depuis cet onglet) :
+```
+1. Cette candidature       → 'hired'
+2. Toutes les autres       → 'rejected' (automatique)
+3. Génération du contrat   → table `contracts` (mécanique déjà existante)
+4. Mission                 → 'assigned'
+```
+
+### Flux Visio Complet
 
 **ÉTAPE 1 — Proposition**
 - Une partie propose 3 créneaux
@@ -257,6 +339,151 @@ Coûts: 150€
 - Stockage: Supabase Storage (visio-recordings bucket)
 - Auto-suppression après 7 jours
 - Droit à l'oubli immédiat si refus
+```
+
+---
+
+## 🧩 Onboarding Candidat
+
+Décision Sprint 4b : wizard d'inscription en **9 étapes**, adapté au
+modèle **mission-first** d'OMLIINK — pas de profil-vitrine public
+contactable librement (voir
+[Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté)). Le
+profil enrichi sert à candidater efficacement et à être présenté à
+l'employeur une fois qu'une candidature/visio est en cours — jamais comme
+une annonce indépendante consultable par n'importe qui.
+
+### Les 9 Étapes
+
+**ÉTAPE 1 — À propos de vous**
+- Sexe, prénom, nom
+- Adresse via autocomplete BAN (même composant que missions —
+  `location_lat`/`location_lng`, voir Matching Algorithm)
+
+**ÉTAPE 2 — Plus d'informations**
+- Date et lieu de naissance
+- Langue(s) parlée(s) — langue natale + langues additionnelles
+- Téléphone + réglage de visibilité (visible ou masqué selon le profil)
+
+**ÉTAPE 3 — Photo — OBLIGATOIRE**
+```
+⚠️ Bloquant : pas de bouton "ignorer cette étape"
+```
+
+**ÉTAPE 4 — Types de services**
+- Cases à cocher multi-select sur les 15 catégories existantes (voir
+  [Services Proposés](#services-proposés))
+
+**ÉTAPE 5 — Suppléments**
+- Premiers secours (certification)
+- Motorisé (véhicule personnel)
+- Permis de conduire
+- Disponibilité immédiate
+
+**ÉTAPE 6 — Expérience et tarif**
+- Niveau d'expérience (débutant / intermédiaire / expérimenté)
+- Tarif horaire
+- Mention légale conditionnelle selon le statut (voir
+  [Statut Candidat & Paiement](#statut-candidat--paiement)) :
+  - `particulier_employeur` : mention CESU / emploi déclaré classique
+  - `auto_entrepreneur` : mention Stripe Connect + commission OMLIINK 10%
+
+**ÉTAPE 7 — Compétences**
+- Taxonomie de tags **spécifique à chaque catégorie de service**
+  sélectionnée à l'étape 4 (voir [Annexe — Référentiel de compétences par
+  catégorie](#annexe--référentiel-de-compétences-par-catégorie) ci-dessous)
+
+**ÉTAPE 8 — Bio / présentation**
+- Titre court + texte libre
+- Enrichit le profil affiché lors d'une candidature — ce n'est **pas** une
+  annonce publique indépendante
+
+**ÉTAPE 9 — Missions suggérées**
+- Pré-matching géographique immédiat juste après l'inscription (tri par
+  distance à l'adresse renseignée à l'étape 1, dans le `radius_km` par
+  défaut — voir [Matching Algorithm](#matching-algorithm))
+
+### Annexe — Référentiel de compétences par catégorie
+
+Utilisé à l'étape 7 du wizard candidat, et repris côté employeur pour le
+sous-typage du besoin (voir
+[Onboarding Employeur](#onboarding-employeur--gestion-des-missions)).
+
+| Catégorie | Tags |
+|---|---|
+| 🧹 Ménage / Repassage | Repassage, Nettoyage vitres, Nettoyage four, Rangement, Produits écologiques, Grand ménage saisonnier, Gestion du linge |
+| 🌿 Jardinage | Tonte pelouse, Taille haies, Désherbage, Plantation, Arrosage, Élagage, Entretien potager, Ramassage feuilles |
+| 🔧 Bricolage | Montage meubles, Petite plomberie, Petite électricité, Peinture, Pose étagères, Réparations diverses, Pose de rideaux |
+| 📦 Déménagement / Manutention | Emballage cartons, Port de charges lourdes, Montage/démontage meubles, Véhicule utilitaire, Manutention sans ascenseur |
+| 👶 Garde d'enfants | Aide aux devoirs, Sorties d'école, Activités créatives, Bain et coucher, Préparation repas enfant, Premiers secours pédiatriques, Bébés/nourrissons, Trajets scolaires |
+| 🐾 Garde d'animaux | Promenade chien, Alimentation, Soins de base, Pension à domicile, Toilettage léger, Nouveaux animaux de compagnie (NAC) |
+| 📚 Cours particuliers | Mathématiques, Français, Langues étrangères, Sciences, Méthodologie/organisation, Soutien primaire, Soutien collège/lycée, Préparation examens |
+| 👴 Aide personnes âgées | Aide aux repas, Aide à la toilette (non médicalisée), Compagnie/conversation, Accompagnement rendez-vous, Rappel de médicaments, Mobilité réduite, Gestes et postures |
+| 💻 Aide informatique / numérique | Initiation smartphone, Configuration ordinateur, Dépannage à distance, Réseaux sociaux, Démarches administratives en ligne, Sécurité numérique |
+| 🍳 Aide préparation repas | Cuisine quotidienne, Batch cooking, Régimes spécifiques, Pâtisserie, Cuisine pour enfants |
+| 📬 Courses / Livraison | Courses alimentaires, Livraison colis, Pharmacie, Gros achats/encombrants, Comparaison prix |
+| 🚗 Accompagnement véhiculé | Permis B, Véhicule personnel, Trajets médicaux, Trajets administratifs, Accompagnement mobilité réduite |
+| 🎄 Aide saisonnière | Déneigement, Préparation jardin hiver/été, Décoration saisonnière, Entretien piscine saisonnier |
+| 📸 Aide événementielle | Service à table, Aide à l'organisation, Rangement post-événement, Garde d'enfants événementielle, Animation |
+| 🏠 Surveillance domicile | Ouverture/fermeture volets, Arrosage plantes en votre absence, Relève courrier, Rondes de sécurité, Présence animaux |
+
+---
+
+## 👔 Onboarding Employeur & Gestion des Missions
+
+Décision Sprint 4c : enrichissement du parcours employeur et de la gestion
+du cycle de vie des missions.
+
+### Étapes enrichies (inscription / création mission)
+
+**À propos de vous**
+- Informations existantes **+ nationalité**
+
+**Mes besoins**
+- Sous-typage du besoin par catégorie de service — reprend le même
+  référentiel de tags que les compétences candidat (voir
+  [Annexe — Référentiel de compétences par catégorie](#annexe--référentiel-de-compétences-par-catégorie)),
+  formulé du point de vue du besoin employeur plutôt que de la compétence
+  candidat
+
+**Votre mission**
+- Titre : 10 à 60 caractères
+- Description : 30 à 2000 caractères
+
+**Photo**
+- Optionnelle
+
+### Gestion des missions (cycle de vie)
+
+```
+Actions disponibles sur une mission publiée :
+✅ Voir
+✅ Éditer
+✅ Mettre en pause   → statut 'paused' (nouveau, voir ARCHITECTURE_DATABASE.md)
+✅ Réactiver         → retour à 'published'
+```
+
+### Suggestions de candidats compatibles
+
+Après publication d'une mission, l'employeur voit des candidats
+compatibles (matching géographique + types de services) avec une
+**invitation à candidater** — jamais un contact direct libre (voir
+[Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté)).
+
+### Nouvel onglet — "Mes intervenants"
+
+Historique des candidats passés `hired` (voir
+[Workflow Candidature & Visio](#workflow-candidature--visio)), distinct
+des candidatures en cours. Permet de retrouver rapidement quelqu'un avec
+qui l'employeur a déjà travaillé pour une nouvelle mission.
+
+### Fonctionnalités transverses candidat (à documenter également)
+
+```
+✅ Vérification de profil : badge, upload pièce d'identité, revue
+   manuelle (pas d'automatisation à ce stade)
+✅ Agenda : vue des visios et missions à venir
+✅ Onglets candidatures : "En attente" / "Historique"
 ```
 
 ---
@@ -478,6 +705,39 @@ Monospace: Geist Mono
 ✅ Visio obligatoire avant mission
 ✅ Rating après mission (rétroaction)
 ✅ Recours signalement (modération)
+```
+
+---
+
+## 🚫 Ce Qui Est Explicitement Écarté
+
+Noté ici pour éviter toute confusion future — ces trois points ont été
+considérés puis délibérément écartés du périmètre actuel :
+
+**Pas de profil-vitrine candidat public contactable librement**
+```
+Contraire au différenciateur "visio obligatoire" : le contact entre
+employeur et candidat reste toujours conditionné à une candidature suivie
+d'une visio. Aucune fonctionnalité (y compris le Premium employeur) ne
+doit donner un accès direct au numéro de téléphone ou à la messagerie
+d'un candidat en dehors de ce parcours.
+```
+
+**Pas de modération automatique d'annonce avec mise en pause système**
+```
+Reporté — pas d'interface admin pour l'instant. La mise en pause d'une
+mission (statut 'paused', voir Onboarding Employeur & Gestion des
+Missions) est une action manuelle de l'employeur, pas une modération
+automatisée par la plateforme.
+```
+
+**Pas d'intégration URSSAF/CESU API automatisée dans l'immédiat**
+```
+L'accompagnement URSSAF du Premium employeur (Sprint 4d) reste manuel,
+assuré par l'équipe OMLIINK sur demande. Le cadre légal d'automatisation
+par les plateformes existe (pilote volontaire depuis avril 2026,
+généralisation prévue 2027 — voir Statut Candidat & Paiement) mais son
+intégration API reste hors périmètre actuel.
 ```
 
 ---

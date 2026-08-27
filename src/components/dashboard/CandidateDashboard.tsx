@@ -72,13 +72,16 @@ export default async function CandidateDashboard({
   const appliedMissions = await getMissionsByIds(myApplications.map((application) => application.mission_id))
   const missionById = new Map(appliedMissions.map((mission) => [mission.id, mission]))
 
-  const acceptedMissionIds = myApplications
-    .filter((application) => application.status === 'accepted')
+  const inProgressMissionIds = myApplications
+    .filter((application) => application.status === 'interviewing' || application.status === 'hired')
     .map((application) => application.mission_id)
-  const activeMissions = acceptedMissionIds
+  const activeMissions = inProgressMissionIds
     .map((id) => missionById.get(id))
     .filter((mission): mission is NonNullable<typeof mission> => Boolean(mission))
-  const visioMeetings = await getVisioMeetingsByMissionIds(acceptedMissionIds)
+  // RLS scopes visio_meetings to its two participants, so even though this
+  // mission may have other candidates' meetings too (parallel interviews),
+  // this query — run as the candidate — only ever returns their own.
+  const visioMeetings = await getVisioMeetingsByMissionIds(inProgressMissionIds)
   const visioMeetingByMissionId = new Map(visioMeetings.map((meeting) => [meeting.mission_id, meeting]))
 
   // This Server Component renders once per request — there's no re-render to

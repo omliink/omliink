@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import StatusBadge from '@/components/ui/StatusBadge'
 import ApplyForm from '@/components/dashboard/ApplyForm'
 import ApplicationsList from '@/components/dashboard/ApplicationsList'
+import InterviewsList from '@/components/dashboard/InterviewsList'
 import VisioSection from '@/components/dashboard/VisioSection'
 import ContractSection from '@/components/dashboard/ContractSection'
 import { haversineDistanceKm } from '@/lib/geo'
@@ -16,7 +17,8 @@ import {
   getMissionById,
   getProfile,
   getProfilesByIds,
-  getVisioMeetingByMissionId,
+  getVisioMeetingForCandidate,
+  getVisioMeetingsByMissionIds,
 } from '@/lib/dashboard-data'
 
 interface MissionDetailPageProps {
@@ -57,6 +59,7 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
   }
 
   const applications = isOwner ? await getApplicationsForMission(mission.id) : []
+  const interviewingApplications = applications.filter((a) => a.status === 'interviewing')
   const candidateIds = applications.map((a) => a.candidate_id)
   const [candidateProfiles, candidateExtendedProfiles] = isOwner
     ? await Promise.all([getProfilesByIds(candidateIds), getCandidateProfilesByUserIds(candidateIds)])
@@ -80,11 +83,20 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
 
   const categoryName = categories.find((category) => category.id === mission.category_id)?.name
 
-  const [visioMeeting, contract] = await Promise.all([
-    getVisioMeetingByMissionId(mission.id),
+  // Owner side: several candidates can each have their own meeting on this
+  // mission (parallel interviews), so this must stay array-returning — a
+  // .maybeSingle() keyed only by mission_id would break as soon as a second
+  // interviewing candidate exists. Candidate side: scoped to their own
+  // meeting only, always at most one row.
+  const [interviewMeetings, myMeeting, contract] = await Promise.all([
+    isOwner ? getVisioMeetingsByMissionIds([mission.id]) : Promise.resolve([]),
+    isCandidateViewer && myApplication ? getVisioMeetingForCandidate(mission.id, user.id) : Promise.resolve(null),
     getContractByMissionId(mission.id),
   ])
-  const isVisioParticipant = isOwner || Boolean(visioMeeting && visioMeeting.candidate_id === user.id)
+  const meetingByApplicationId = new Map(
+    interviewMeetings.filter((m) => m.application_id).map((m) => [m.application_id as string, m])
+  )
+  const isContractParticipant = isOwner || Boolean(contract && contract.candidate_id === user.id)
   const contractCandidateProfile = contract
     ? (candidateProfileById.get(contract.candidate_id) ?? (await getCandidateProfile(contract.candidate_id)))
     : null
@@ -145,6 +157,20 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
         </div>
       )}
 
+      {isOwner && (
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold text-gray-900">Entretiens</h2>
+          <InterviewsList
+            applications={interviewingApplications}
+            missionId={mission.id}
+            candidateNameById={candidateNameById}
+            candidateProfileById={candidateProfileById}
+            meetingByApplicationId={meetingByApplicationId}
+            now={now}
+          />
+        </div>
+      )}
+
       {isCandidateViewer && (
         <div className="mt-10">
           <h2 className="text-lg font-semibold text-gray-900">Votre candidature</h2>
@@ -161,11 +187,11 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
         </div>
       )}
 
-      {visioMeeting && isVisioParticipant && (
-        <VisioSection meeting={visioMeeting} missionId={mission.id} isEmployerViewer={isOwner} now={now} />
+      {myMeeting && (
+        <VisioSection meeting={myMeeting} missionId={mission.id} isEmployerViewer={false} now={now} />
       )}
 
-      {contract && isVisioParticipant && (
+      {contract && isContractParticipant && (
         <ContractSection
           contract={contract}
           mission={mission}

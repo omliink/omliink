@@ -222,73 +222,32 @@ export async function endVisioMeeting(meetingId: string, missionId: string) {
     throw new Error(error.message)
   }
 
-  const { data: mission } = await supabase.from('missions').select('*').eq('id', missionId).maybeSingle()
-  if (!mission) {
-    revalidatePath(`/dashboard/missions/${missionId}`)
-    return
-  }
-
-  const { error: missionUpdateError } = await supabase
-    .from('missions')
-    .update({ status: 'assigned' })
-    .eq('id', missionId)
-  if (missionUpdateError) {
-    console.error('[endVisioMeeting] mission status update failed', { missionId, error: missionUpdateError })
-  }
+  // Ending a visio no longer confirms the mission or generates a contract —
+  // that now only happens when the employer explicitly hires a candidate
+  // (see hiring.ts's chooseCandidate), since several parallel interviews
+  // can end without any of them being the final choice.
+  const { data: mission } = await supabase.from('missions').select('title').eq('id', missionId).maybeSingle()
 
   await Promise.all([
     createNotification(supabase, {
       userId: meeting.employer_id,
       type: 'visio_completed',
-      title: 'Visio terminée, mission confirmée',
-      message: `La visioconférence pour "${mission.title}" est terminée. La mission est confirmée.`,
+      title: 'Visio terminée',
+      message: mission
+        ? `La visioconférence pour "${mission.title}" est terminée.`
+        : 'La visioconférence est terminée.',
       relatedId: missionId,
     }),
     createNotification(supabase, {
       userId: meeting.candidate_id,
       type: 'visio_completed',
-      title: 'Visio terminée, mission confirmée',
-      message: `La visioconférence pour "${mission.title}" est terminée. La mission est confirmée.`,
+      title: 'Visio terminée',
+      message: mission
+        ? `La visioconférence pour "${mission.title}" est terminée.`
+        : 'La visioconférence est terminée.',
       relatedId: missionId,
     }),
   ])
-
-  const { data: existingContract } = await supabase
-    .from('contracts')
-    .select('id')
-    .eq('mission_id', missionId)
-    .maybeSingle()
-
-  if (!existingContract) {
-    const { error: contractInsertError } = await supabase.from('contracts').insert({
-      mission_id: missionId,
-      candidate_id: meeting.candidate_id,
-      employer_id: meeting.employer_id,
-      status: 'pending',
-      total_amount: mission.budget,
-      payment_status: 'pending',
-    })
-    if (contractInsertError) {
-      console.error('[endVisioMeeting] contract insert failed', { missionId, error: contractInsertError })
-    }
-
-    await Promise.all([
-      createNotification(supabase, {
-        userId: meeting.employer_id,
-        type: 'contract_ready',
-        title: 'Contrat prêt à signer',
-        message: `Le contrat pour "${mission.title}" est prêt à être signé.`,
-        relatedId: missionId,
-      }),
-      createNotification(supabase, {
-        userId: meeting.candidate_id,
-        type: 'contract_ready',
-        title: 'Contrat prêt à signer',
-        message: `Le contrat pour "${mission.title}" est prêt à être signé.`,
-        relatedId: missionId,
-      }),
-    ])
-  }
 
   revalidatePath(`/dashboard/missions/${missionId}`)
 }

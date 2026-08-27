@@ -44,6 +44,10 @@ export default function VisioSection({ meeting, missionId, isEmployerViewer, now
           </p>
         )}
 
+        {meeting.status === 'cancelled' && (
+          <p className="text-sm text-gray-500">Cette visioconférence a été annulée.</p>
+        )}
+
         {(meeting.status === 'no_show_employer' || meeting.status === 'no_show_candidate') && (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-gray-700">

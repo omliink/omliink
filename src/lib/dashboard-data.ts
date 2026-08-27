@@ -177,9 +177,22 @@ export async function getMessagesForConversation(conversationId: string): Promis
   return data ?? []
 }
 
-export async function getVisioMeetingByMissionId(missionId: string): Promise<VisioMeeting | null> {
+// Safe to use with parallel interviews: scoped to one specific candidate, so
+// it always returns at most one row even when several candidates each have
+// their own visio_meeting on the same mission. Unlike a bare
+// eq('mission_id', ...).maybeSingle(), which breaks once more than one
+// meeting exists per mission.
+export async function getVisioMeetingForCandidate(
+  missionId: string,
+  candidateId: string
+): Promise<VisioMeeting | null> {
   const supabase = await createServerSupabaseClient()
-  const { data } = await supabase.from('visio_meetings').select('*').eq('mission_id', missionId).maybeSingle()
+  const { data } = await supabase
+    .from('visio_meetings')
+    .select('*')
+    .eq('mission_id', missionId)
+    .eq('candidate_id', candidateId)
+    .maybeSingle()
   return data
 }
 
