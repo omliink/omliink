@@ -45,6 +45,32 @@ export async function createMission(
   }
 
   const status = formData.get('status') === 'published' ? 'published' : 'draft'
+
+  // Free-tier limit: max 2 simultaneously active (published or paused)
+  // missions — only checked when the new mission would itself be published;
+  // saving as a draft never counts against it.
+  if (status === 'published') {
+    const { data: employerProfile } = await supabase
+      .from('employer_profiles')
+      .select('subscription_tier')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (employerProfile?.subscription_tier !== 'premium') {
+      const { count } = await supabase
+        .from('missions')
+        .select('id', { count: 'exact', head: true })
+        .eq('employer_id', user.id)
+        .in('status', ['published', 'paused'])
+
+      if ((count ?? 0) >= 2) {
+        return {
+          error:
+            "Vous avez atteint la limite de 2 missions actives de l'offre gratuite. Passez en Premium pour publier sans limite, ou clôturez/mettez en pause une mission existante.",
+        }
+      }
+    }
+  }
   const title = String(formData.get('title') ?? '').trim()
   const description = String(formData.get('description') ?? '').trim()
   const categoryId = String(formData.get('category_id') ?? '')

@@ -25,7 +25,12 @@ function SubmitButton() {
   )
 }
 
-export default function PajemploiConnectionCard({ connection }: { connection: SocialConnection | null }) {
+interface PajemploiConnectionCardProps {
+  connection: SocialConnection | null
+  isPremium: boolean
+}
+
+export default function PajemploiConnectionCard({ connection, isPremium }: PajemploiConnectionCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [mandateChecked, setMandateChecked] = useState(false)
   const [state, formAction] = useActionState(connectPajemploi, initialState)
@@ -63,7 +68,13 @@ export default function PajemploiConnectionCard({ connection }: { connection: So
         </div>
       )}
 
-      {status === 'not_connected' && !expanded && (
+      {status === 'not_connected' && !isPremium && (
+        <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center">
+          <p className="text-sm text-gray-600">Fonctionnalité réservée aux employeurs Premium.</p>
+        </div>
+      )}
+
+      {status === 'not_connected' && isPremium && !expanded && (
         <button
           type="button"
           onClick={() => setExpanded(true)}
@@ -73,7 +84,7 @@ export default function PajemploiConnectionCard({ connection }: { connection: So
         </button>
       )}
 
-      {status === 'not_connected' && expanded && (
+      {status === 'not_connected' && isPremium && expanded && (
         <form action={formAction} className="mt-4 flex flex-col gap-4">
           <div>
             <label htmlFor="pajemploi_account_number" className="mb-1 block text-sm font-medium text-gray-700">

@@ -6,6 +6,7 @@ import CategoryFilter from './CategoryFilter'
 import ActiveMissionCard from './ActiveMissionCard'
 import DistanceFilterToggle from './DistanceFilterToggle'
 import { haversineDistanceKm } from '@/lib/geo'
+import { comparePremiumThenDistance } from '@/lib/mission-priority'
 import { parseVisioTimestamp } from '@/lib/visio-time'
 import {
   getCandidateApplications,
@@ -13,6 +14,7 @@ import {
   getCategories,
   getInvitationsForCandidate,
   getMissionsByIds,
+  getPremiumEmployerIds,
   getProfilesByIds,
   getPublishedMissions,
   getVisioMeetingsByMissionIds,
@@ -59,13 +61,17 @@ export default async function CandidateDashboard({
         : null,
   }))
 
-  if (hasLocation) {
-    availableMissionsWithDistance.sort((a, b) => {
-      if (a.distanceKm == null) return 1
-      if (b.distanceKm == null) return -1
-      return a.distanceKm - b.distanceKm
-    })
-  }
+  // Premium employers surface first — safe to apply unconditionally (not
+  // just when hasLocation) because the radius filter below already bounds
+  // the whole result set to what's geographically relevant; there's no risk
+  // of a distant premium mission jumping ahead of a genuinely nearby one
+  // outside that set, since it would be filtered out regardless.
+  const premiumEmployerIds = await getPremiumEmployerIds([
+    ...new Set(availableMissionsWithDistance.map((entry) => entry.mission.employer_id)),
+  ])
+  availableMissionsWithDistance.sort((a, b) =>
+    comparePremiumThenDistance(a, b, (entry) => entry.mission.employer_id, (entry) => entry.distanceKm, premiumEmployerIds)
+  )
 
   const visibleMissionsWithDistance =
     hasLocation && !showAllDistance

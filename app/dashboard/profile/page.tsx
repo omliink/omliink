@@ -147,7 +147,11 @@ export default async function ProfilePage() {
 
           <EmployerBioBlock bio={employerProfile.bio} />
 
-          <SocialConnectionsBlock connections={socialConnections} defaultPhone={profile.phone} />
+          <SocialConnectionsBlock
+            connections={socialConnections}
+            defaultPhone={profile.phone}
+            isPremium={employerProfile.subscription_tier === 'premium'}
+          />
 
           <PasswordBlock />
         </section>

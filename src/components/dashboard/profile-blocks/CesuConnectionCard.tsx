@@ -32,9 +32,11 @@ const MANDATE_LABEL =
 export default function CesuConnectionCard({
   connection,
   defaultPhone,
+  isPremium,
 }: {
   connection: SocialConnection | null
   defaultPhone: string | null
+  isPremium: boolean
 }) {
   const [path, setPath] = useState<'existing' | 'new' | null>(null)
 
@@ -82,7 +84,13 @@ export default function CesuConnectionCard({
         </div>
       )}
 
-      {status === 'not_connected' && path === null && (
+      {status === 'not_connected' && !isPremium && (
+        <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center">
+          <p className="text-sm text-gray-600">Fonctionnalité réservée aux employeurs Premium.</p>
+        </div>
+      )}
+
+      {status === 'not_connected' && isPremium && path === null && (
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
@@ -101,7 +109,7 @@ export default function CesuConnectionCard({
         </div>
       )}
 
-      {status === 'not_connected' && path === 'existing' && (
+      {status === 'not_connected' && isPremium && path === 'existing' && (
         <form action={existingAction} className="mt-4 flex flex-col gap-4">
           <div>
             <label htmlFor="cesu_account_number" className="mb-1 block text-sm font-medium text-gray-700">
@@ -143,7 +151,7 @@ export default function CesuConnectionCard({
         </form>
       )}
 
-      {status === 'not_connected' && path === 'new' && (
+      {status === 'not_connected' && isPremium && path === 'new' && (
         <form action={newAction} className="mt-4 flex flex-col gap-4">
           <div>
             <span className="mb-1 block text-sm font-medium text-gray-700">Civilité</span>

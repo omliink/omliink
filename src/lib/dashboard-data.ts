@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import { createServerSupabaseClient } from './supabase-server'
 import { haversineDistanceKm } from './geo'
+import { comparePremiumThenDistance } from './mission-priority'
 import type { Database } from '@/types/database.types'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
@@ -158,9 +159,25 @@ export interface SuggestedMission extends Mission {
   distanceKm: number | null
 }
 
+// Employers currently on the premium tier, among the given set — used to
+// prioritise their missions in candidate-facing listings (Sprint 4d).
+export async function getPremiumEmployerIds(employerIds: string[]): Promise<Set<string>> {
+  if (employerIds.length === 0) return new Set()
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('employer_profiles')
+    .select('user_id')
+    .in('user_id', employerIds)
+    .eq('subscription_tier', 'premium')
+  return new Set((data ?? []).map((row) => row.user_id))
+}
+
 // Used right after onboarding completes (dashboard's "Missions suggérées"
-// banner) — matches the candidate's chosen service categories, ranked by
-// distance from their reference address via the existing haversine helper.
+// banner) — matches the candidate's chosen service categories, capped to
+// the candidate's radius_km (same relevance guarantee as the main dashboard
+// listing, which filters by radius downstream of its own sort — see
+// CandidateDashboard.tsx), premium employers surfaced first within that
+// already-relevant set, then by distance.
 export async function getSuggestedMissionsForCandidate(candidateId: string, limit = 5): Promise<SuggestedMission[]> {
   const [profile, categoryIds] = await Promise.all([
     getCandidateProfile(candidateId),
@@ -178,8 +195,9 @@ export async function getSuggestedMissionsForCandidate(candidateId: string, limi
 
   const lat = profile.location_lat
   const lng = profile.location_lng
+  const radiusKm = profile.radius_km
 
-  return (data ?? [])
+  const missionsWithDistance = (data ?? [])
     .map((mission) => ({
       ...mission,
       distanceKm:
@@ -187,11 +205,20 @@ export async function getSuggestedMissionsForCandidate(candidateId: string, limi
           ? haversineDistanceKm(lat, lng, mission.location_lat, mission.location_lng)
           : null,
     }))
-    .sort((a, b) => {
-      if (a.distanceKm == null) return 1
-      if (b.distanceKm == null) return -1
-      return a.distanceKm - b.distanceKm
-    })
+    .filter((mission) => mission.distanceKm == null || mission.distanceKm <= radiusKm)
+
+  const premiumEmployerIds = await getPremiumEmployerIds([...new Set(missionsWithDistance.map((m) => m.employer_id))])
+
+  return missionsWithDistance
+    .sort((a, b) =>
+      comparePremiumThenDistance(
+        a,
+        b,
+        (m) => m.employer_id,
+        (m) => m.distanceKm,
+        premiumEmployerIds
+      )
+    )
     .slice(0, limit)
 }
 

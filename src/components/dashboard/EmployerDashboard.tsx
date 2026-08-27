@@ -3,12 +3,14 @@ import StatusBadge from '@/components/ui/StatusBadge'
 import ActiveMissionCard from './ActiveMissionCard'
 import EmployerMissionsGrid from './EmployerMissionsGrid'
 import EmployerCollaboratorsList from './EmployerCollaboratorsList'
+import PremiumStatusBlock from './PremiumStatusBlock'
 import {
   getApplicationsForMissions,
   getCategories,
   getContractsByMissionIds,
   getEmployerCollaborators,
   getEmployerMissions,
+  getEmployerProfile,
   getProfilesByIds,
   getVisioMeetingsByMissionIds,
 } from '@/lib/dashboard-data'
@@ -24,11 +26,12 @@ interface EmployerDashboardProps {
 export default async function EmployerDashboard({ employerId, fullName }: EmployerDashboardProps) {
   const missions = await getEmployerMissions(employerId)
   const missionIds = missions.map((mission) => mission.id)
-  const [categories, applications, visioMeetings, collaborators] = await Promise.all([
+  const [categories, applications, visioMeetings, collaborators, employerProfile] = await Promise.all([
     getCategories(),
     getApplicationsForMissions(missionIds),
     getVisioMeetingsByMissionIds(missionIds),
     getEmployerCollaborators(employerId),
+    getEmployerProfile(employerId),
   ])
 
   const recentApplications = [...applications]
@@ -88,6 +91,11 @@ export default async function EmployerDashboard({ employerId, fullName }: Employ
           Créer une mission
         </Link>
       </div>
+
+      <PremiumStatusBlock
+        subscriptionTier={employerProfile?.subscription_tier ?? 'free'}
+        subscriptionCurrentPeriodEnd={employerProfile?.subscription_current_period_end ?? null}
+      />
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-gray-100 bg-white p-5">

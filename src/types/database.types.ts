@@ -248,6 +248,10 @@ type EmployerProfilesRow = {
   stripe_customer_id: string | null
   nationality: string | null
   photo_url: string | null
+  subscription_tier: string
+  subscription_status: string | null
+  stripe_subscription_id: string | null
+  subscription_current_period_end: string | null
   created_at: string
   updated_at: string
 }
@@ -263,10 +267,58 @@ type EmployerProfilesInsert = {
   stripe_customer_id?: string | null
   nationality?: string | null
   photo_url?: string | null
+  subscription_tier?: string
+  subscription_status?: string | null
+  stripe_subscription_id?: string | null
+  subscription_current_period_end?: string | null
   created_at?: string
   updated_at?: string
 }
 type EmployerProfilesUpdate = Partial<EmployerProfilesInsert>
+
+// --- promo_codes ---
+type PromoCodesRow = {
+  id: string
+  code: string
+  discount_type: string
+  discount_value: number
+  valid_from: string | null
+  valid_until: string | null
+  max_uses: number | null
+  current_uses: number
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+type PromoCodesInsert = {
+  id?: string
+  code: string
+  discount_type: string
+  discount_value: number
+  valid_from?: string | null
+  valid_until?: string | null
+  max_uses?: number | null
+  current_uses?: number
+  active?: boolean
+  created_at?: string
+  updated_at?: string
+}
+type PromoCodesUpdate = Partial<PromoCodesInsert>
+
+// --- promo_code_redemptions ---
+type PromoCodeRedemptionsRow = {
+  id: string
+  employer_id: string
+  promo_code_id: string
+  redeemed_at: string
+}
+type PromoCodeRedemptionsInsert = {
+  id?: string
+  employer_id: string
+  promo_code_id: string
+  redeemed_at?: string
+}
+type PromoCodeRedemptionsUpdate = Partial<PromoCodeRedemptionsInsert>
 
 // --- employer_social_connections ---
 type EmployerSocialConnectionsRow = {
@@ -668,6 +720,18 @@ export interface Database {
         Row: EmployerSocialConnectionsRow
         Insert: EmployerSocialConnectionsInsert
         Update: EmployerSocialConnectionsUpdate
+        Relationships: []
+      }
+      promo_codes: {
+        Row: PromoCodesRow
+        Insert: PromoCodesInsert
+        Update: PromoCodesUpdate
+        Relationships: []
+      }
+      promo_code_redemptions: {
+        Row: PromoCodeRedemptionsRow
+        Insert: PromoCodeRedemptionsInsert
+        Update: PromoCodeRedemptionsUpdate
         Relationships: []
       }
       employer_profiles: {
