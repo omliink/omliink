@@ -1,8 +1,16 @@
 import { createServerSupabaseClient } from './supabase-server'
 
+// Single source of truth for the admin route prefix — deliberately obscure
+// rather than /admin (defense in depth against automated scans; the actual
+// authorization boundary is is_admin_user()/requireAdminUser(), unaffected
+// by this path). Every internal link, redirect, and revalidatePath() call
+// for the admin surface goes through this constant so a future rename never
+// requires re-grepping the codebase for a hardcoded string again.
+export const ADMIN_BASE_PATH = '/ops-9k3xq7wmvz2r'
+
 /**
  * Re-checks is_admin against the database on every call — used at the top
- * of the /admin layout (gates page rendering) AND independently at the top
+ * of the admin layout (gates page rendering) AND independently at the top
  * of every admin Server Action (gates the mutation itself). Neither trusts
  * the other: a client-side render decision is never sufficient authorization
  * for a privileged write, and RLS policies using is_admin_user() are the

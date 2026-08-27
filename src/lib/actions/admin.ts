@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { requireAdminUser } from '@/lib/admin-auth'
+import { ADMIN_BASE_PATH, requireAdminUser } from '@/lib/admin-auth'
 import { createNotification } from '@/lib/notifications-helpers'
 
 export interface AdminActionState {
@@ -62,8 +62,8 @@ export async function approveVerification(candidateId: string): Promise<AdminAct
     message: 'Votre profil a été vérifié. Le badge de vérification est maintenant visible sur votre profil.',
   })
 
-  revalidatePath('/admin/verifications')
-  revalidatePath('/admin')
+  revalidatePath(`${ADMIN_BASE_PATH}/verifications`)
+  revalidatePath(ADMIN_BASE_PATH)
   return { success: true }
 }
 
@@ -93,8 +93,8 @@ export async function rejectVerification(
       : 'Votre demande de vérification a été refusée. Vous pouvez soumettre un nouveau document.',
   })
 
-  revalidatePath('/admin/verifications')
-  revalidatePath('/admin')
+  revalidatePath(`${ADMIN_BASE_PATH}/verifications`)
+  revalidatePath(ADMIN_BASE_PATH)
   return { success: true }
 }
 
@@ -144,8 +144,8 @@ export async function createPromoCode(_prevState: AdminActionState, formData: Fo
     return { error: error.message }
   }
 
-  revalidatePath('/admin/promo-codes')
-  revalidatePath('/admin')
+  revalidatePath(`${ADMIN_BASE_PATH}/promo-codes`)
+  revalidatePath(ADMIN_BASE_PATH)
   return { success: true }
 }
 
@@ -156,8 +156,8 @@ export async function deactivatePromoCode(promoCodeId: string): Promise<AdminAct
   const { error } = await admin.supabase.from('promo_codes').update({ active: false }).eq('id', promoCodeId)
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/promo-codes')
-  revalidatePath('/admin')
+  revalidatePath(`${ADMIN_BASE_PATH}/promo-codes`)
+  revalidatePath(ADMIN_BASE_PATH)
   return { success: true }
 }
 
@@ -176,7 +176,7 @@ export async function markSocialConnectionConnected(connectionId: string): Promi
     .eq('id', connectionId)
   if (error) return { error: error.message }
 
-  revalidatePath('/admin/cesu-pajemploi')
-  revalidatePath('/admin')
+  revalidatePath(`${ADMIN_BASE_PATH}/cesu-pajemploi`)
+  revalidatePath(ADMIN_BASE_PATH)
   return { success: true }
 }

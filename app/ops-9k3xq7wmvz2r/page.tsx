@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ADMIN_BASE_PATH } from '@/lib/admin-auth'
 import {
   getActivePromoCodeCount,
   getPendingSocialConnectionCount,
@@ -13,9 +14,13 @@ export default async function AdminDashboardPage() {
   ])
 
   const cards = [
-    { href: '/admin/verifications', label: 'Vérifications en attente', count: pendingVerifications },
-    { href: '/admin/cesu-pajemploi', label: 'Demandes CESU/Pajemploi en attente', count: pendingSocialConnections },
-    { href: '/admin/promo-codes', label: 'Codes promo actifs', count: activePromoCodes },
+    { href: `${ADMIN_BASE_PATH}/verifications`, label: 'Vérifications en attente', count: pendingVerifications },
+    {
+      href: `${ADMIN_BASE_PATH}/cesu-pajemploi`,
+      label: 'Demandes CESU/Pajemploi en attente',
+      count: pendingSocialConnections,
+    },
+    { href: `${ADMIN_BASE_PATH}/promo-codes`, label: 'Codes promo actifs', count: activePromoCodes },
   ]
 
   return (

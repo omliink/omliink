@@ -1,13 +1,13 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { requireAdminUser } from '@/lib/admin-auth'
+import { ADMIN_BASE_PATH, requireAdminUser } from '@/lib/admin-auth'
 
 const ADMIN_LINKS = [
-  { href: '/admin', label: 'Tableau de bord' },
-  { href: '/admin/verifications', label: 'Vérifications' },
-  { href: '/admin/promo-codes', label: 'Codes promo' },
-  { href: '/admin/cesu-pajemploi', label: 'CESU / Pajemploi' },
-  { href: '/admin/missions', label: 'Missions' },
+  { href: ADMIN_BASE_PATH, label: 'Tableau de bord' },
+  { href: `${ADMIN_BASE_PATH}/verifications`, label: 'Vérifications' },
+  { href: `${ADMIN_BASE_PATH}/promo-codes`, label: 'Codes promo' },
+  { href: `${ADMIN_BASE_PATH}/cesu-pajemploi`, label: 'CESU / Pajemploi' },
+  { href: `${ADMIN_BASE_PATH}/missions`, label: 'Missions' },
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -21,7 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="flex min-h-screen bg-gray-50">
       <aside className="w-56 flex-shrink-0 border-r border-gray-100 bg-white px-4 py-6">
-        <Link href="/admin" className="flex items-center gap-2 px-2 text-lg font-bold text-gray-900">
+        <Link href={ADMIN_BASE_PATH} className="flex items-center gap-2 px-2 text-lg font-bold text-gray-900">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-900 text-sm font-bold text-white">
             A
           </span>
