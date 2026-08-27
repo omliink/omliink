@@ -15,6 +15,9 @@ type Message = Database['public']['Tables']['messages']['Row']
 type Notification = Database['public']['Tables']['notifications']['Row']
 type VisioMeeting = Database['public']['Tables']['visio_meetings']['Row']
 type Contract = Database['public']['Tables']['contracts']['Row']
+type MissionNeedTaxonomy = Database['public']['Tables']['mission_need_taxonomy']['Row']
+type MissionNeeds = Database['public']['Tables']['mission_needs']['Row']
+type MissionInvitation = Database['public']['Tables']['mission_invitations']['Row']
 
 export const getCurrentUser = cache(async () => {
   const supabase = await createServerSupabaseClient()
@@ -270,6 +273,13 @@ export async function getContractByMissionId(missionId: string): Promise<Contrac
   return data
 }
 
+export async function getContractsByMissionIds(missionIds: string[]): Promise<Contract[]> {
+  if (missionIds.length === 0) return []
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('contracts').select('*').in('mission_id', missionIds)
+  return data ?? []
+}
+
 export async function getUnreadMessagesForConversations(
   conversationIds: string[],
   userId: string
@@ -321,4 +331,109 @@ export async function getUnreadNotificationsCountForUser(userId: string): Promis
     .eq('is_read', false)
 
   return count ?? 0
+}
+
+export const getMissionNeedTaxonomy = cache(async (): Promise<MissionNeedTaxonomy[]> => {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('mission_need_taxonomy').select('*').order('label', { ascending: true })
+  return data ?? []
+})
+
+export async function getMissionNeeds(missionId: string): Promise<MissionNeeds[]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('mission_needs').select('*').eq('mission_id', missionId)
+  return data ?? []
+}
+
+export async function getMissionNeedsForMissions(missionIds: string[]): Promise<MissionNeeds[]> {
+  if (missionIds.length === 0) return []
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('mission_needs').select('*').in('mission_id', missionIds)
+  return data ?? []
+}
+
+// "Mes intervenants": every candidate this employer has hired at least once,
+// across any of their missions — a standing collaboration history distinct
+// from the live "candidatures en cours" list.
+export interface Collaborator {
+  candidateId: string
+  mission: Mission
+  application: Application
+}
+
+export async function getEmployerCollaborators(employerId: string): Promise<Collaborator[]> {
+  const missions = await getEmployerMissions(employerId)
+  const missionIds = missions.map((m) => m.id)
+  if (missionIds.length === 0) return []
+  const missionById = new Map(missions.map((m) => [m.id, m]))
+
+  const applications = await getApplicationsForMissions(missionIds)
+  return applications
+    .filter((application) => application.status === 'hired')
+    .map((application) => ({
+      candidateId: application.candidate_id,
+      mission: missionById.get(application.mission_id)!,
+      application,
+    }))
+}
+
+export interface SuggestedCandidate {
+  candidateId: string
+  profile: CandidateProfile
+  distanceKm: number | null
+}
+
+// Candidates compatible with a just-published mission: same service
+// category (candidate_service_types), not already applied, ranked by
+// distance from the mission when both sides have coordinates.
+export async function getSuggestedCandidatesForMission(mission: Mission, limit = 10): Promise<SuggestedCandidate[]> {
+  const supabase = await createServerSupabaseClient()
+
+  const [{ data: candidateTypeRows }, existingApplications] = await Promise.all([
+    supabase.from('candidate_service_types').select('candidate_id').eq('category_id', mission.category_id),
+    getApplicationsForMission(mission.id),
+  ])
+
+  const candidateIds = [...new Set((candidateTypeRows ?? []).map((row) => row.candidate_id))]
+  const appliedIds = new Set(existingApplications.map((a) => a.candidate_id))
+  const eligibleIds = candidateIds.filter((id) => !appliedIds.has(id))
+  if (eligibleIds.length === 0) return []
+
+  const profiles = await getCandidateProfilesByUserIds(eligibleIds)
+
+  return profiles
+    .map((profile) => ({
+      candidateId: profile.user_id,
+      profile,
+      distanceKm:
+        mission.location_lat != null &&
+        mission.location_lng != null &&
+        profile.location_lat != null &&
+        profile.location_lng != null
+          ? haversineDistanceKm(mission.location_lat, mission.location_lng, profile.location_lat, profile.location_lng)
+          : null,
+    }))
+    .sort((a, b) => {
+      if (a.distanceKm == null) return 1
+      if (b.distanceKm == null) return -1
+      return a.distanceKm - b.distanceKm
+    })
+    .slice(0, limit)
+}
+
+export async function getInvitationsForMission(missionId: string): Promise<MissionInvitation[]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('mission_invitations').select('*').eq('mission_id', missionId)
+  return data ?? []
+}
+
+export async function getInvitationsForCandidate(candidateId: string): Promise<MissionInvitation[]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('mission_invitations')
+    .select('*')
+    .eq('candidate_id', candidateId)
+    .in('status', ['pending', 'viewed'])
+    .order('created_at', { ascending: false })
+  return data ?? []
 }

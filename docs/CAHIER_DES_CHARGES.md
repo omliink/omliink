@@ -460,19 +460,31 @@ du cycle de vie des missions.
 **À propos de vous**
 - Informations existantes **+ nationalité**
 
-**Mes besoins**
-- Sous-typage du besoin par catégorie de service — reprend le même
-  référentiel de tags que les compétences candidat (voir
-  [Annexe — Référentiel de compétences par catégorie](#annexe--référentiel-de-compétences-par-catégorie)),
-  formulé du point de vue du besoin employeur plutôt que de la compétence
-  candidat
+**Mes besoins** (étape intégrée au formulaire de création/édition de
+mission plutôt qu'à l'onboarding employeur lui-même — cohérent avec le
+fait que `mission_needs` est rattaché à une mission qui doit déjà exister)
+- Sous-typage du besoin par catégorie de service, affiché dès que la
+  catégorie est choisie — même mécanique conditionnelle que les
+  compétences candidat du Sprint 4b, mais **référentiel séparé**
+  (`mission_need_taxonomy`, 52 tags) plutôt que la réutilisation de
+  `skill_taxonomy` envisagée initialement ici : les deux vocabulaires
+  diffèrent (besoin employeur — "Auxiliaire de vie" — vs compétence
+  candidat — "Aide à la toilette"), voir ARCHITECTURE_DATABASE.md.
 
 **Votre mission**
 - Titre : 10 à 60 caractères
 - Description : 30 à 2000 caractères
 
 **Photo**
-- Optionnelle
+- Optionnelle, avec bouton "Ignorer pour l'instant" — étape ajoutée après
+  coup au Sprint 4c (analysée dans le scénario Yoopies mais absente du
+  prompt initial du sprint). Réutilise le pattern d'upload du candidat
+  (Sprint 4b) : bucket Storage dédié `employer-photos`, policies
+  insert/update/delete restreintes au dossier `{auth.uid()}/…`, pas
+  d'`upsert:true` (leçon retenue du bug Sprint 4b). Contrairement au
+  candidat, le champ `employer_profiles.photo_url` est nullable — rien
+  n'oblige l'employeur à en fournir une. Affichée côté candidat ("Publié
+  par [Nom]") sur la page de détail mission dès que celle-ci est publiée.
 
 ### Gestion des missions (cycle de vie)
 

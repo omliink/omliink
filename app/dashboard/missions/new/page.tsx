@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getCategories, getCurrentUser, getProfile } from '@/lib/dashboard-data'
+import { getCategories, getCurrentUser, getMissionNeedTaxonomy, getProfile } from '@/lib/dashboard-data'
 import MissionForm from '@/components/dashboard/MissionForm'
 
 export default async function NewMissionPage() {
@@ -13,7 +13,7 @@ export default async function NewMissionPage() {
     redirect('/dashboard')
   }
 
-  const categories = await getCategories()
+  const [categories, missionNeedTaxonomy] = await Promise.all([getCategories(), getMissionNeedTaxonomy()])
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -21,7 +21,7 @@ export default async function NewMissionPage() {
       <p className="mt-1 text-sm text-gray-600">Décrivez la mission pour trouver le bon candidat.</p>
 
       <div className="mt-8">
-        <MissionForm categories={categories} />
+        <MissionForm categories={categories} missionNeedTaxonomy={missionNeedTaxonomy} />
       </div>
     </div>
   )

@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import type { Database } from '@/types/database.types'
 
 type CandidateProfileUpdate = Database['public']['Tables']['candidate_profiles']['Update']
+type EmployerProfileUpdate = Database['public']['Tables']['employer_profiles']['Update']
 
 export interface ProfileFormState {
   error?: string
@@ -102,14 +103,31 @@ export async function updateEmployerProfile(
 
   const companyName = String(formData.get('company_name') ?? '').trim()
   const bio = String(formData.get('bio') ?? '').trim()
+  const nationality = String(formData.get('nationality') ?? '').trim()
 
-  const { error } = await supabase
-    .from('employer_profiles')
-    .update({
-      company_name: companyName || null,
-      bio: bio || null,
-    })
-    .eq('user_id', user.id)
+  const updatePayload: EmployerProfileUpdate = {
+    company_name: companyName || null,
+    bio: bio || null,
+    nationality: nationality || null,
+  }
+
+  // Optional — the field is only present when the employer chose a new
+  // file this submission; leaving it out entirely otherwise keeps
+  // whatever photo_url is already saved untouched.
+  const photoFile = formData.get('photo')
+  if (photoFile instanceof File && photoFile.size > 0) {
+    const photoPath = `${user.id}/${Date.now()}-${photoFile.name}`
+    const { error: uploadError } = await supabase.storage.from('employer-photos').upload(photoPath, photoFile)
+    if (uploadError) {
+      return { error: `Échec de l'upload de la photo : ${uploadError.message}` }
+    }
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('employer-photos').getPublicUrl(photoPath)
+    updatePayload.photo_url = publicUrl
+  }
+
+  const { error } = await supabase.from('employer_profiles').update(updatePayload).eq('user_id', user.id)
 
   if (error) {
     return { error: error.message }

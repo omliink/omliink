@@ -184,6 +184,57 @@ type CandidateSkillsInsert = {
 }
 type CandidateSkillsUpdate = Partial<CandidateSkillsInsert>
 
+// --- mission_need_taxonomy ---
+type MissionNeedTaxonomyRow = {
+  id: string
+  category_id: string
+  need_tag: string
+  label: string
+  created_at: string
+}
+type MissionNeedTaxonomyInsert = {
+  id?: string
+  category_id: string
+  need_tag: string
+  label: string
+  created_at?: string
+}
+type MissionNeedTaxonomyUpdate = Partial<MissionNeedTaxonomyInsert>
+
+// --- mission_needs ---
+type MissionNeedsRow = {
+  id: string
+  mission_id: string
+  category_id: string
+  need_tag: string
+  created_at: string
+}
+type MissionNeedsInsert = {
+  id?: string
+  mission_id: string
+  category_id: string
+  need_tag: string
+  created_at?: string
+}
+type MissionNeedsUpdate = Partial<MissionNeedsInsert>
+
+// --- mission_invitations ---
+type MissionInvitationsRow = {
+  id: string
+  mission_id: string
+  candidate_id: string
+  status: string
+  created_at: string
+}
+type MissionInvitationsInsert = {
+  id?: string
+  mission_id: string
+  candidate_id: string
+  status?: string
+  created_at?: string
+}
+type MissionInvitationsUpdate = Partial<MissionInvitationsInsert>
+
 // --- employer_profiles ---
 type EmployerProfilesRow = {
   id: string
@@ -195,6 +246,8 @@ type EmployerProfilesRow = {
   rating: number
   payment_verified: boolean
   stripe_customer_id: string | null
+  nationality: string | null
+  photo_url: string | null
   created_at: string
   updated_at: string
 }
@@ -208,6 +261,8 @@ type EmployerProfilesInsert = {
   rating?: number
   payment_verified?: boolean
   stripe_customer_id?: string | null
+  nationality?: string | null
+  photo_url?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -612,6 +667,24 @@ export interface Database {
         Row: CandidateSkillsRow
         Insert: CandidateSkillsInsert
         Update: CandidateSkillsUpdate
+        Relationships: []
+      }
+      mission_need_taxonomy: {
+        Row: MissionNeedTaxonomyRow
+        Insert: MissionNeedTaxonomyInsert
+        Update: MissionNeedTaxonomyUpdate
+        Relationships: []
+      }
+      mission_needs: {
+        Row: MissionNeedsRow
+        Insert: MissionNeedsInsert
+        Update: MissionNeedsUpdate
+        Relationships: []
+      }
+      mission_invitations: {
+        Row: MissionInvitationsRow
+        Insert: MissionInvitationsInsert
+        Update: MissionInvitationsUpdate
         Relationships: []
       }
       missions: { Row: MissionsRow; Insert: MissionsInsert; Update: MissionsUpdate; Relationships: [] }

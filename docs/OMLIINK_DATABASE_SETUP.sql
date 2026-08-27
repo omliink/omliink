@@ -91,6 +91,8 @@ CREATE TABLE employer_profiles (
   rating DECIMAL(3, 2) DEFAULT 0,
   payment_verified BOOLEAN DEFAULT FALSE,
   stripe_customer_id VARCHAR(255),
+  nationality TEXT,                       -- Sprint 4c, étape "À propos de vous"
+  photo_url TEXT,                         -- Sprint 4c, optionnelle (contrairement au candidat)
 
   -- Abonnement Premium (Sprint 4d) — Stripe Subscriptions, distinct du
   -- Stripe Checkout des paiements de mission
@@ -594,6 +596,96 @@ CREATE POLICY "candidate_skills_select_via_application"
 -- manuelle via le rôle service (pas d'interface de revue applicative).
 -- Voir la migration 20260829020000_sprint4b_storage_buckets.sql pour le
 -- détail des policies storage.objects.
+--
+-- employer-photos (Sprint 4c, ajouté après coup — analysé dans le scénario
+-- Yoopies mais oublié du prompt initial du sprint) : public, même
+-- restriction de dossier {auth.uid()}/…, bucket dédié plutôt que partagé
+-- avec candidate-photos (employeur/candidat = deux lignes différentes de
+-- profiles, mélanger leurs fichiers dans un seul bucket exigerait une RLS
+-- par chemin plus confuse que deux buckets propres par rôle). Contrairement
+-- au candidat, le champ est nullable et l'upload optionnel (bouton
+-- "Ignorer pour l'instant" à l'inscription). Voir migration
+-- 20260830020000_sprint4c_employer_photo.sql.
+--
+-- Lecture du nom/photo employeur par un candidat non-encore-postulant : a
+-- nécessité une policy SELECT supplémentaire sur profiles ET
+-- employer_profiles (aucune des deux n'était lisible par un candidat avant
+-- sa première candidature), via une fonction SECURITY DEFINER partagée
+-- employer_has_published_mission(employer_id) — voir migration
+-- 20260830030000_sprint4c_employer_public_info.sql.
+
+-- ========================================
+-- 23b. MISSION_NEED_TAXONOMY (Sprint 4c — référentiel public)
+-- ========================================
+-- Séparé de skill_taxonomy (Sprint 4b) plutôt que réutilisé : les tags sont
+-- formulés du point de vue du besoin employeur ("Auxiliaire de vie", "Dame
+-- de compagnie") et non de la compétence candidat ("Aide à la toilette"),
+-- deux vocabulaires distincts même quand la catégorie est la même. 52 tags
+-- au total (3-4 par catégorie), validés en revue avant seed — voir
+-- migration 20260830010000_sprint4c_mission_need_taxonomy_seed.sql.
+CREATE TABLE mission_need_taxonomy (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
+  need_tag VARCHAR(100) NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(category_id, need_tag)
+);
+
+ALTER TABLE mission_need_taxonomy ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "mission_need_taxonomy_select_all"
+  ON mission_need_taxonomy FOR SELECT USING (TRUE);
+
+-- ========================================
+-- 23c. MISSION_NEEDS (Sprint 4c — sous-typage du besoin, étape "Mes besoins")
+-- ========================================
+-- Composite FK vers mission_need_taxonomy(category_id, need_tag) — même
+-- garde-fou que candidate_skills en Sprint 4b (empêche d'associer un tag à
+-- la mauvaise catégorie).
+CREATE TABLE mission_needs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  mission_id UUID NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+  category_id UUID NOT NULL,
+  need_tag VARCHAR(100) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(mission_id, need_tag),
+  FOREIGN KEY (category_id, need_tag) REFERENCES mission_need_taxonomy(category_id, need_tag) ON DELETE CASCADE
+);
+
+ALTER TABLE mission_needs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "mission_needs_select_all"
+  ON mission_needs FOR SELECT USING (TRUE);
+CREATE POLICY "mission_needs_manage_owner"
+  ON mission_needs FOR ALL USING (
+    EXISTS (SELECT 1 FROM missions WHERE missions.id = mission_needs.mission_id AND missions.employer_id = auth.uid())
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM missions WHERE missions.id = mission_needs.mission_id AND missions.employer_id = auth.uid())
+  );
+
+-- ========================================
+-- 23d. MISSION_INVITATIONS (Sprint 4c — suggestions de candidats + invitation)
+-- ========================================
+CREATE TABLE mission_invitations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  mission_id UUID NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+  candidate_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  -- 'pending', 'viewed', 'applied', 'declined'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(mission_id, candidate_id)
+);
+
+ALTER TABLE mission_invitations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "mission_invitations_manage_employer"
+  ON mission_invitations FOR ALL USING (
+    EXISTS (SELECT 1 FROM missions WHERE missions.id = mission_invitations.mission_id AND missions.employer_id = auth.uid())
+  ) WITH CHECK (
+    EXISTS (SELECT 1 FROM missions WHERE missions.id = mission_invitations.mission_id AND missions.employer_id = auth.uid())
+  );
+CREATE POLICY "mission_invitations_select_candidate"
+  ON mission_invitations FOR SELECT USING (candidate_id = auth.uid());
+CREATE POLICY "mission_invitations_update_candidate"
+  ON mission_invitations FOR UPDATE USING (candidate_id = auth.uid()) WITH CHECK (candidate_id = auth.uid());
 
 -- ========================================
 -- 24. PROMO_CODES (Sprint 4d — abonnement Premium)

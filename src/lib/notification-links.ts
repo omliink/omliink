@@ -10,7 +10,8 @@ export function getNotificationHref(type: string | null, relatedId: string | nul
     type === 'visio_proposed' ||
     type === 'visio_accepted' ||
     type === 'visio_completed' ||
-    type === 'contract_ready'
+    type === 'contract_ready' ||
+    type === 'mission_invitation'
   ) {
     return `/dashboard/missions/${relatedId}`
   }

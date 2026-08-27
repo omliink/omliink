@@ -1,11 +1,13 @@
 import Link from 'next/link'
-import MissionCard from '@/components/ui/MissionCard'
-import EmptyState from '@/components/ui/EmptyState'
 import ActiveMissionCard from './ActiveMissionCard'
+import EmployerMissionsTabs from './EmployerMissionsTabs'
 import {
   getApplicationsForMissions,
   getCategories,
+  getContractsByMissionIds,
+  getEmployerCollaborators,
   getEmployerMissions,
+  getProfilesByIds,
   getVisioMeetingsByMissionIds,
 } from '@/lib/dashboard-data'
 
@@ -16,30 +18,34 @@ interface EmployerDashboardProps {
   fullName: string
 }
 
-function MissionsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-8 w-8" aria-hidden="true">
-      <path d="M4 7h16M4 12h10M4 17h7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none" />
-    </svg>
-  )
-}
-
 export default async function EmployerDashboard({ employerId, fullName }: EmployerDashboardProps) {
   const missions = await getEmployerMissions(employerId)
   const missionIds = missions.map((mission) => mission.id)
-  const [categories, applications, visioMeetings] = await Promise.all([
+  const [categories, applications, visioMeetings, collaborators] = await Promise.all([
     getCategories(),
     getApplicationsForMissions(missionIds),
     getVisioMeetingsByMissionIds(missionIds),
+    getEmployerCollaborators(employerId),
   ])
+
+  const [collaboratorProfiles, collaboratorContracts] = await Promise.all([
+    getProfilesByIds([...new Set(collaborators.map((c) => c.candidateId))]),
+    getContractsByMissionIds([...new Set(collaborators.map((c) => c.mission.id))]),
+  ])
+  const profileById = new Map(collaboratorProfiles.map((p) => [p.id, p]))
+  const contractByMissionId = new Map(collaboratorContracts.map((c) => [c.mission_id, c]))
 
   const categoryMap = new Map(categories.map((category) => [category.id, category.name]))
   const applicationsCountByMission = new Map<string, number>()
+  const hiredMissionIds = new Set<string>()
   applications.forEach((application) => {
     applicationsCountByMission.set(
       application.mission_id,
       (applicationsCountByMission.get(application.mission_id) ?? 0) + 1
     )
+    if (application.status === 'hired') {
+      hiredMissionIds.add(application.mission_id)
+    }
   })
 
   const activeMissionsCount = missions.filter(
@@ -95,36 +101,15 @@ export default async function EmployerDashboard({ employerId, fullName }: Employ
       )}
 
       <div className="mt-8">
-        <h2 className="text-lg font-semibold text-gray-900">Mes missions</h2>
-        {missions.length === 0 ? (
-          <div className="mt-4">
-            <EmptyState
-              icon={<MissionsIcon />}
-              title="Aucune mission pour le moment"
-              description="Créez votre première mission pour commencer à recevoir des candidatures."
-              action={
-                <Link
-                  href="/dashboard/missions/new"
-                  className="inline-flex items-center justify-center rounded-lg bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-600"
-                >
-                  Créer une mission
-                </Link>
-              }
-            />
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {missions.map((mission) => (
-              <MissionCard
-                key={mission.id}
-                mission={mission}
-                variant="employer"
-                categoryName={categoryMap.get(mission.category_id)}
-                applicationsCount={applicationsCountByMission.get(mission.id) ?? 0}
-              />
-            ))}
-          </div>
-        )}
+        <EmployerMissionsTabs
+          missions={missions}
+          categoryMap={categoryMap}
+          applicationsCountByMission={applicationsCountByMission}
+          hiredMissionIds={hiredMissionIds}
+          collaborators={collaborators}
+          profileById={profileById}
+          contractByMissionId={contractByMissionId}
+        />
       </div>
     </section>
   )

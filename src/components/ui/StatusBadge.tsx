@@ -1,6 +1,7 @@
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   draft: { label: 'Brouillon', className: 'bg-gray-100 text-gray-600' },
   published: { label: 'Publiée', className: 'bg-indigo-100 text-indigo-700' },
+  paused: { label: 'En pause', className: 'bg-gray-100 text-gray-600' },
   visio_scheduled: { label: 'Visio à planifier', className: 'bg-purple-100 text-purple-700' },
   assigned: { label: 'Assignée', className: 'bg-blue-100 text-blue-700' },
   in_progress: { label: 'En cours', className: 'bg-amber-100 text-amber-700' },

@@ -5,6 +5,7 @@ import ApplicationsList from '@/components/dashboard/ApplicationsList'
 import InterviewsList from '@/components/dashboard/InterviewsList'
 import VisioSection from '@/components/dashboard/VisioSection'
 import ContractSection from '@/components/dashboard/ContractSection'
+import SuggestedCandidatesList from '@/components/dashboard/SuggestedCandidatesList'
 import { haversineDistanceKm } from '@/lib/geo'
 import {
   getApplicationForMissionAndCandidate,
@@ -14,9 +15,14 @@ import {
   getCategories,
   getContractByMissionId,
   getCurrentUser,
+  getEmployerProfile,
+  getInvitationsForMission,
   getMissionById,
+  getMissionNeedTaxonomy,
+  getMissionNeeds,
   getProfile,
   getProfilesByIds,
+  getSuggestedCandidatesForMission,
   getVisioMeetingForCandidate,
   getVisioMeetingsByMissionIds,
 } from '@/lib/dashboard-data'
@@ -83,6 +89,22 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
 
   const categoryName = categories.find((category) => category.id === mission.category_id)?.name
 
+  const [employerProfileBasic, employerProfileExtended] = isCandidateViewer
+    ? await Promise.all([getProfile(mission.employer_id), getEmployerProfile(mission.employer_id)])
+    : [null, null]
+
+  const [missionNeeds, missionNeedTaxonomy] = await Promise.all([getMissionNeeds(mission.id), getMissionNeedTaxonomy()])
+  const needLabelByTag = new Map(missionNeedTaxonomy.map((n) => [`${n.category_id}:${n.need_tag}`, n.label]))
+
+  const [suggestedCandidates, invitations] = isOwner && mission.status === 'published'
+    ? await Promise.all([getSuggestedCandidatesForMission(mission), getInvitationsForMission(mission.id)])
+    : [[], []]
+  const suggestedCandidateNames = isOwner
+    ? await getProfilesByIds(suggestedCandidates.map((c) => c.candidateId))
+    : []
+  const suggestedNameById = new Map(suggestedCandidateNames.map((p) => [p.id, p.full_name ?? p.email]))
+  const invitedCandidateIds = invitations.filter((i) => i.status !== 'declined').map((i) => i.candidate_id)
+
   // Owner side: several candidates can each have their own meeting on this
   // mission (parallel interviews), so this must stay array-returning — a
   // .maybeSingle() keyed only by mission_id would break as soon as a second
@@ -116,6 +138,16 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
         <StatusBadge status={mission.status} />
       </div>
 
+      {isCandidateViewer && employerProfileBasic && (
+        <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+          {employerProfileExtended?.photo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={employerProfileExtended.photo_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+          )}
+          <span>Publié par {employerProfileBasic.full_name ?? employerProfileBasic.email}</span>
+        </div>
+      )}
+
       <dl className="mt-6 grid gap-4 rounded-xl border border-gray-100 bg-white p-5 sm:grid-cols-2">
         <div>
           <dt className="text-xs font-medium text-gray-500">Date</dt>
@@ -141,6 +173,31 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
         <div className="mt-6">
           <h2 className="text-sm font-semibold text-gray-900">Description</h2>
           <p className="mt-2 whitespace-pre-wrap text-sm text-gray-600">{mission.description}</p>
+        </div>
+      )}
+
+      {missionNeeds.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {missionNeeds.map((need) => (
+            <span key={need.id} className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+              {needLabelByTag.get(`${need.category_id}:${need.need_tag}`) ?? need.need_tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {isOwner && mission.status === 'published' && (
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold text-gray-900">Candidats suggérés</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Candidats compatibles avec cette mission que vous pouvez inviter à candidater.
+          </p>
+          <SuggestedCandidatesList
+            missionId={mission.id}
+            candidates={suggestedCandidates}
+            nameByCandidateId={suggestedNameById}
+            initiallyInvitedIds={invitedCandidateIds}
+          />
         </div>
       )}
 

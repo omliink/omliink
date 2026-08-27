@@ -31,6 +31,22 @@ export default function EmployerProfileForm({ profile }: { profile: EmployerProf
   return (
     <form action={formAction} noValidate className="flex flex-col gap-5">
       <div>
+        <span className="mb-1 block text-sm font-medium text-gray-700">Photo (optionnelle)</span>
+        <div className="flex items-center gap-3">
+          {profile.photo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profile.photo_url} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
+          )}
+          <input
+            type="file"
+            name="photo"
+            accept="image/*"
+            className="block flex-1 text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-500 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-600"
+          />
+        </div>
+      </div>
+
+      <div>
         <label htmlFor="company_name" className="mb-1 block text-sm font-medium text-gray-700">
           Nom / société
         </label>
@@ -40,6 +56,20 @@ export default function EmployerProfileForm({ profile }: { profile: EmployerProf
           type="text"
           defaultValue={profile.company_name ?? ''}
           placeholder="Jeanne Dupont"
+          className={inputClass}
+        />
+      </div>
+
+      <div>
+        <label htmlFor="nationality" className="mb-1 block text-sm font-medium text-gray-700">
+          Nationalité
+        </label>
+        <input
+          id="nationality"
+          name="nationality"
+          type="text"
+          defaultValue={profile.nationality ?? ''}
+          placeholder="Française"
           className={inputClass}
         />
       </div>

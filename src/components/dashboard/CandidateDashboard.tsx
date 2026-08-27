@@ -11,6 +11,7 @@ import {
   getCandidateApplications,
   getCandidateProfile,
   getCategories,
+  getInvitationsForCandidate,
   getMissionsByIds,
   getProfilesByIds,
   getPublishedMissions,
@@ -112,6 +113,12 @@ export default async function CandidateDashboard({
     .map((id) => missionById.get(id))
     .filter((mission): mission is NonNullable<typeof mission> => mission != null && mission.status !== 'completed')
 
+  // Invitations: missions where an employer directly invited this candidate
+  // to apply. Purely informational — applying stays entirely optional.
+  const invitations = await getInvitationsForCandidate(candidateId)
+  const invitedMissions = await getMissionsByIds(invitations.map((i) => i.mission_id))
+  const invitedMissionById = new Map(invitedMissions.map((m) => [m.id, m]))
+
   // Applications tabs: "En attente" (still live) vs "Historique" (settled).
   const pendingApplications = myApplications.filter(
     (application) => application.status === 'pending' || application.status === 'interviewing'
@@ -178,6 +185,38 @@ export default async function CandidateDashboard({
                 </Link>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {invitations.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Missions qui vous ont repéré</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Des employeurs vous ont invité(e) à candidater. Libre à vous de donner suite ou non.
+          </p>
+          <div className="mt-4 flex flex-col gap-2">
+            {invitations.map((invitation) => {
+              const mission = invitedMissionById.get(invitation.mission_id)
+              if (!mission) return null
+              return (
+                <div
+                  key={invitation.id}
+                  className="flex items-center justify-between gap-4 rounded-xl border border-indigo-100 bg-indigo-50/50 p-4"
+                >
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium uppercase tracking-wide text-indigo-500">Invitation</p>
+                    <p className="truncate text-sm font-semibold text-gray-900">{mission.title}</p>
+                  </div>
+                  <Link
+                    href={`/dashboard/missions/${mission.id}`}
+                    className="flex-shrink-0 rounded-lg bg-indigo-500 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-600"
+                  >
+                    Voir la mission
+                  </Link>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

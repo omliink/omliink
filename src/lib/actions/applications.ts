@@ -51,6 +51,14 @@ export async function applyToMission(
     })
   }
 
+  // If this application follows an employer invitation, close the loop on
+  // it so the employer can see it converted rather than sitting "pending".
+  await supabase
+    .from('mission_invitations')
+    .update({ status: 'applied' })
+    .eq('mission_id', missionId)
+    .eq('candidate_id', user.id)
+
   revalidatePath(`/dashboard/missions/${missionId}`)
   return { success: true }
 }
