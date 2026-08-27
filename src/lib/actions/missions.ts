@@ -148,9 +148,16 @@ export async function updateMission(
     redirect('/auth/login')
   }
 
-  const { data: mission } = await supabase.from('missions').select('employer_id').eq('id', missionId).maybeSingle()
+  const { data: mission } = await supabase
+    .from('missions')
+    .select('employer_id, moderation_status')
+    .eq('id', missionId)
+    .maybeSingle()
   if (!mission || mission.employer_id !== user.id) {
     return { error: 'Non autorisé' }
+  }
+  if (mission.moderation_status !== 'normal') {
+    return { error: 'Cette mission est suspendue ou supprimée par la modération et ne peut plus être modifiée.' }
   }
 
   const { data: hiredApplication } = await supabase
@@ -227,9 +234,16 @@ export async function toggleMissionPause(missionId: string) {
     redirect('/auth/login')
   }
 
-  const { data: mission } = await supabase.from('missions').select('employer_id, status').eq('id', missionId).maybeSingle()
+  const { data: mission } = await supabase
+    .from('missions')
+    .select('employer_id, status, moderation_status')
+    .eq('id', missionId)
+    .maybeSingle()
   if (!mission || mission.employer_id !== user.id) {
     throw new Error('Non autorisé')
+  }
+  if (mission.moderation_status !== 'normal') {
+    throw new Error('Cette mission est suspendue ou supprimée par la modération et ne peut plus être modifiée.')
   }
 
   let nextStatus: string | null = null

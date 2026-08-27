@@ -7,14 +7,16 @@ import { toggleMissionPause } from '@/lib/actions/missions'
 interface MissionActionsMenuProps {
   missionId: string
   status: string
+  moderationStatus: string
   hasHiredApplication: boolean
 }
 
-export default function MissionActionsMenu({ missionId, status, hasHiredApplication }: MissionActionsMenuProps) {
+export default function MissionActionsMenu({ missionId, status, moderationStatus, hasHiredApplication }: MissionActionsMenuProps) {
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
 
-  const canPauseToggle = status === 'published' || status === 'paused'
+  const isModerated = moderationStatus !== 'normal'
+  const canPauseToggle = (status === 'published' || status === 'paused') && !isModerated
 
   const handleTogglePause = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -59,7 +61,14 @@ export default function MissionActionsMenu({ missionId, status, hasHiredApplicat
               Voir
             </Link>
 
-            {hasHiredApplication ? (
+            {isModerated ? (
+              <span
+                className="block px-4 py-2 text-sm text-gray-400"
+                title="Suspendue ou supprimée par la modération"
+              >
+                Éditer — suspendue par la modération
+              </span>
+            ) : hasHiredApplication ? (
               <span className="block px-4 py-2 text-sm text-gray-400" title="Non modifiable après embauche">
                 Éditer — non modifiable après embauche
               </span>

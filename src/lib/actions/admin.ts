@@ -2,7 +2,9 @@
 
 import { revalidatePath } from 'next/cache'
 import { ADMIN_BASE_PATH, requireAdminUser } from '@/lib/admin-auth'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { createNotification } from '@/lib/notifications-helpers'
+import { MISSION_REPORT_REASON_LABELS } from '@/lib/mission-report-reasons'
 
 export interface AdminActionState {
   error?: string
@@ -178,5 +180,183 @@ export async function markSocialConnectionConnected(connectionId: string): Promi
 
   revalidatePath(`${ADMIN_BASE_PATH}/cesu-pajemploi`)
   revalidatePath(ADMIN_BASE_PATH)
+  return { success: true }
+}
+
+// --- Modération missions ---
+
+async function markPendingReportsReviewed(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  missionId: string,
+  adminUserId: string
+) {
+  await supabase
+    .from('mission_reports')
+    .update({ status: 'reviewed', reviewed_at: new Date().toISOString(), reviewed_by: adminUserId })
+    .eq('mission_id', missionId)
+    .eq('status', 'pending')
+}
+
+export async function suspendMission(missionId: string): Promise<AdminActionState> {
+  const admin = await requireAdminUser()
+  if (!admin) return NOT_AUTHORIZED
+
+  const { data: mission } = await admin.supabase
+    .from('missions')
+    .select('employer_id, title, moderation_status')
+    .eq('id', missionId)
+    .maybeSingle()
+  if (!mission) return { error: 'Mission introuvable.' }
+  if (mission.moderation_status === 'suspended') return { error: 'Cette mission est déjà suspendue.' }
+  if (mission.moderation_status === 'removed') return { error: 'Cette mission a été supprimée, elle ne peut plus être suspendue.' }
+
+  const { data: pendingReports } = await admin.supabase
+    .from('mission_reports')
+    .select('reason')
+    .eq('mission_id', missionId)
+    .eq('status', 'pending')
+
+  const { error } = await admin.supabase
+    .from('missions')
+    .update({ moderation_status: 'suspended' })
+    .eq('id', missionId)
+  if (error) return { error: error.message }
+
+  if (pendingReports && pendingReports.length > 0) {
+    await markPendingReportsReviewed(admin.supabase, missionId, admin.user.id)
+  }
+
+  const reasons = [...new Set((pendingReports ?? []).map((r) => MISSION_REPORT_REASON_LABELS[r.reason] ?? r.reason))]
+  const reasonSuffix = reasons.length > 0 ? ` Motif signalé : ${reasons.join(', ')}.` : ''
+
+  await createNotification(admin.supabase, {
+    userId: mission.employer_id,
+    type: 'mission_suspended',
+    title: 'Mission suspendue',
+    message: `Votre mission "${mission.title}" a été suspendue par notre équipe de modération.${reasonSuffix}`,
+    relatedId: missionId,
+  })
+
+  revalidatePath(`${ADMIN_BASE_PATH}/missions`)
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+export async function reactivateMission(missionId: string): Promise<AdminActionState> {
+  const admin = await requireAdminUser()
+  if (!admin) return NOT_AUTHORIZED
+
+  const { data: mission } = await admin.supabase
+    .from('missions')
+    .select('moderation_status')
+    .eq('id', missionId)
+    .maybeSingle()
+  if (!mission) return { error: 'Mission introuvable.' }
+  // Deliberately one-way: a removed mission is never reactivated through
+  // this action, only a suspended one — "suppression définitive" stays
+  // definitive from the UI's perspective even though it's just a status
+  // value underneath.
+  if (mission.moderation_status !== 'suspended') {
+    return { error: 'Seule une mission suspendue peut être réactivée.' }
+  }
+
+  const { error } = await admin.supabase
+    .from('missions')
+    .update({ moderation_status: 'normal' })
+    .eq('id', missionId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`${ADMIN_BASE_PATH}/missions`)
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+export async function removeMission(missionId: string): Promise<AdminActionState> {
+  const admin = await requireAdminUser()
+  if (!admin) return NOT_AUTHORIZED
+
+  const { data: mission } = await admin.supabase
+    .from('missions')
+    .select('employer_id, title, moderation_status')
+    .eq('id', missionId)
+    .maybeSingle()
+  if (!mission) return { error: 'Mission introuvable.' }
+  if (mission.moderation_status === 'removed') return { error: 'Cette mission est déjà supprimée.' }
+
+  const { data: hiredApplication } = await admin.supabase
+    .from('applications')
+    .select('id')
+    .eq('mission_id', missionId)
+    .eq('status', 'hired')
+    .maybeSingle()
+  if (hiredApplication) {
+    return {
+      error:
+        'Impossible de supprimer : un candidat a déjà été embauché sur cette mission (contrat généré). Suspendez-la si besoin plutôt que de la supprimer.',
+    }
+  }
+
+  const { data: activeApplications } = await admin.supabase
+    .from('applications')
+    .select('id, candidate_id')
+    .eq('mission_id', missionId)
+    .in('status', ['pending', 'interviewing'])
+
+  const { error } = await admin.supabase.from('missions').update({ moderation_status: 'removed' }).eq('id', missionId)
+  if (error) return { error: error.message }
+
+  if (activeApplications && activeApplications.length > 0) {
+    await admin.supabase
+      .from('applications')
+      .update({ status: 'rejected', responded_at: new Date().toISOString() })
+      .eq('mission_id', missionId)
+      .in('status', ['pending', 'interviewing'])
+
+    await Promise.all(
+      activeApplications.map((application) =>
+        createNotification(admin.supabase, {
+          userId: application.candidate_id,
+          type: 'application_rejected',
+          title: 'Candidature refusée',
+          message: `Votre candidature pour "${mission.title}" a été refusée : la mission a été retirée par notre équipe de modération.`,
+          relatedId: missionId,
+        })
+      )
+    )
+  }
+
+  const { data: pendingReports } = await admin.supabase
+    .from('mission_reports')
+    .select('id')
+    .eq('mission_id', missionId)
+    .eq('status', 'pending')
+  if (pendingReports && pendingReports.length > 0) {
+    await markPendingReportsReviewed(admin.supabase, missionId, admin.user.id)
+  }
+
+  await createNotification(admin.supabase, {
+    userId: mission.employer_id,
+    type: 'mission_removed',
+    title: 'Mission supprimée',
+    message: `Votre mission "${mission.title}" a été supprimée par notre équipe de modération.`,
+    relatedId: missionId,
+  })
+
+  revalidatePath(`${ADMIN_BASE_PATH}/missions`)
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+export async function dismissMissionReport(reportId: string): Promise<AdminActionState> {
+  const admin = await requireAdminUser()
+  if (!admin) return NOT_AUTHORIZED
+
+  const { error } = await admin.supabase
+    .from('mission_reports')
+    .update({ status: 'dismissed', reviewed_at: new Date().toISOString(), reviewed_by: admin.user.id })
+    .eq('id', reportId)
+  if (error) return { error: error.message }
+
+  revalidatePath(`${ADMIN_BASE_PATH}/missions`)
   return { success: true }
 }

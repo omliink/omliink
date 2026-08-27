@@ -27,7 +27,15 @@ export async function applyToMission(
 
   const coverLetter = String(formData.get('cover_letter') ?? '').trim()
 
-  const { data: mission } = await supabase.from('missions').select('employer_id, title').eq('id', missionId).maybeSingle()
+  const { data: mission } = await supabase
+    .from('missions')
+    .select('employer_id, title, moderation_status')
+    .eq('id', missionId)
+    .maybeSingle()
+
+  if (mission && mission.moderation_status !== 'normal') {
+    return { error: "Cette mission n'est plus disponible." }
+  }
 
   const { error } = await supabase.from('applications').insert({
     mission_id: missionId,

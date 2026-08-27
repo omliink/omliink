@@ -49,11 +49,17 @@ export default function MissionCard({
             </p>
             <h3 className="mt-1 text-base font-semibold text-gray-900">{mission.title}</h3>
           </div>
-          {!actionsSlot && <StatusBadge status={mission.status} />}
+          {!actionsSlot && (
+            <div className="flex flex-col items-end gap-1">
+              <StatusBadge status={mission.status} />
+              {mission.moderation_status !== 'normal' && <StatusBadge status={mission.moderation_status} />}
+            </div>
+          )}
         </div>
         {actionsSlot && (
-          <div className="mt-1">
+          <div className="mt-1 flex flex-wrap gap-1.5">
             <StatusBadge status={mission.status} />
+            {mission.moderation_status !== 'normal' && <StatusBadge status={mission.moderation_status} />}
           </div>
         )}
 

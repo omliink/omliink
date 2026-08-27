@@ -16,7 +16,7 @@ import {
   getMissionsByIds,
   getPremiumEmployerIds,
   getProfilesByIds,
-  getPublishedMissions,
+  getPublishedMissionsForCandidate,
   getVisioMeetingsByMissionIds,
 } from '@/lib/dashboard-data'
 
@@ -34,7 +34,7 @@ export default async function CandidateDashboard({
   showAllDistance,
 }: CandidateDashboardProps) {
   const [allMissions, categories, myApplications, candidateProfile] = await Promise.all([
-    getPublishedMissions(),
+    getPublishedMissionsForCandidate(),
     getCategories(),
     getCandidateApplications(candidateId),
     getCandidateProfile(candidateId),

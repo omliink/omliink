@@ -60,6 +60,7 @@ export default function EmployerMissionsGrid({
             <MissionActionsMenu
               missionId={mission.id}
               status={mission.status}
+              moderationStatus={mission.moderation_status}
               hasHiredApplication={hiredMissionIds.has(mission.id)}
             />
           }

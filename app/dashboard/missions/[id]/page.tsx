@@ -3,6 +3,7 @@ import StatusBadge from '@/components/ui/StatusBadge'
 import ApplyForm from '@/components/dashboard/ApplyForm'
 import ApplicationsList from '@/components/dashboard/ApplicationsList'
 import InterviewsList from '@/components/dashboard/InterviewsList'
+import ReportMissionButton from '@/components/dashboard/ReportMissionButton'
 import VisioSection from '@/components/dashboard/VisioSection'
 import ContractSection from '@/components/dashboard/ContractSection'
 import SuggestedCandidatesList from '@/components/dashboard/SuggestedCandidatesList'
@@ -58,11 +59,18 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
   }
 
   const isOwner = mission.employer_id === user.id
+  const isAdmin = Boolean(profile?.is_admin)
   const isCandidateViewer = Boolean(profile?.is_candidate) && !isOwner
 
   const myApplication = isCandidateViewer ? await getApplicationForMissionAndCandidate(mission.id, user.id) : null
 
-  if (!isOwner && mission.status !== 'published' && !myApplication) {
+  // A suspended/removed mission is treated the same as a non-published one
+  // for anyone without a standing reason to still see it: the owner, an
+  // admin reviewing it, or a candidate who already applied before it was
+  // hidden (never lose access on a status change — same principle as the
+  // Sprint 4a application-visibility fix).
+  const isVisibleToGeneralViewer = mission.status === 'published' && mission.moderation_status === 'normal'
+  if (!isOwner && !isAdmin && !myApplication && !isVisibleToGeneralViewer) {
     redirect('/dashboard')
   }
 
@@ -156,8 +164,17 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
           <p className="text-xs font-medium uppercase tracking-wide text-indigo-500">{categoryName ?? 'Catégorie'}</p>
           <h1 className="mt-1 text-2xl font-bold text-gray-900">{mission.title}</h1>
         </div>
-        <StatusBadge status={mission.status} />
+        <div className="flex flex-shrink-0 flex-col items-end gap-1.5">
+          <StatusBadge status={mission.status} />
+          {mission.moderation_status !== 'normal' && <StatusBadge status={mission.moderation_status} />}
+        </div>
       </div>
+
+      {!isOwner && !isAdmin && (
+        <div className="mt-3">
+          <ReportMissionButton missionId={mission.id} />
+        </div>
+      )}
 
       {isCandidateViewer && employerProfileBasic && (
         <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">

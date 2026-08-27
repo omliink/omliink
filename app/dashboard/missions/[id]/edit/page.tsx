@@ -27,6 +27,9 @@ export default async function EditMissionPage({ params }: EditMissionPageProps) 
   if (mission.employer_id !== user.id) {
     redirect('/dashboard')
   }
+  if (mission.moderation_status !== 'normal') {
+    redirect(`/dashboard/missions/${mission.id}`)
+  }
 
   const applications = await getApplicationsForMission(mission.id)
   if (applications.some((application) => application.status === 'hired')) {

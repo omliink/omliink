@@ -385,6 +385,7 @@ type MissionsRow = {
   location_lat: number | null
   location_lng: number | null
   status: string
+  moderation_status: string
   mission_date: string | null
   mission_time_start: string | null
   mission_time_end: string | null
@@ -407,6 +408,7 @@ type MissionsInsert = {
   location_lat?: number | null
   location_lng?: number | null
   status?: string
+  moderation_status?: string
   mission_date?: string | null
   mission_time_start?: string | null
   mission_time_end?: string | null
@@ -420,6 +422,31 @@ type MissionsInsert = {
   updated_at?: string
 }
 type MissionsUpdate = Partial<MissionsInsert>
+
+// --- mission_reports ---
+type MissionReportsRow = {
+  id: string
+  mission_id: string
+  reporter_id: string
+  reason: string
+  details: string | null
+  status: string
+  created_at: string
+  reviewed_at: string | null
+  reviewed_by: string | null
+}
+type MissionReportsInsert = {
+  id?: string
+  mission_id: string
+  reporter_id: string
+  reason: string
+  details?: string | null
+  status?: string
+  created_at?: string
+  reviewed_at?: string | null
+  reviewed_by?: string | null
+}
+type MissionReportsUpdate = Partial<MissionReportsInsert>
 
 // --- visio_meetings ---
 type VisioMeetingsRow = {
@@ -791,6 +818,12 @@ export interface Database {
         Relationships: []
       }
       missions: { Row: MissionsRow; Insert: MissionsInsert; Update: MissionsUpdate; Relationships: [] }
+      mission_reports: {
+        Row: MissionReportsRow
+        Insert: MissionReportsInsert
+        Update: MissionReportsUpdate
+        Relationships: []
+      }
       visio_meetings: {
         Row: VisioMeetingsRow
         Insert: VisioMeetingsInsert

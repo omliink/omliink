@@ -63,12 +63,32 @@ export async function getApplicationsForMissions(missionIds: string[]): Promise<
   return data ?? []
 }
 
+// Admin-facing (the /ops-.../missions moderation list) — deliberately NOT
+// filtered by moderation_status, since the admin needs to see suspended
+// missions too (to review/reactivate them). Candidate-facing code must use
+// getPublishedMissionsForCandidate below instead.
 export async function getPublishedMissions(): Promise<Mission[]> {
   const supabase = await createServerSupabaseClient()
   const { data } = await supabase
     .from('missions')
     .select('*')
     .eq('status', 'published')
+    .order('mission_date', { ascending: true })
+  return data ?? []
+}
+
+// Candidate-facing: a mission must be both published (employer's own
+// status) AND moderation_status = 'normal' (admin's independent gate) to be
+// visible here. RLS already enforces this for a non-admin caller, but the
+// explicit filter is kept as defense in depth and to make the rule visible
+// in the query itself rather than relying solely on an invisible policy.
+export async function getPublishedMissionsForCandidate(): Promise<Mission[]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('missions')
+    .select('*')
+    .eq('status', 'published')
+    .eq('moderation_status', 'normal')
     .order('mission_date', { ascending: true })
   return data ?? []
 }
@@ -202,6 +222,7 @@ export async function getSuggestedMissionsForCandidate(candidateId: string, limi
     .from('missions')
     .select('*')
     .eq('status', 'published')
+    .eq('moderation_status', 'normal')
     .in('category_id', categoryIds)
     .order('mission_date', { ascending: true })
 
@@ -566,4 +587,55 @@ export async function getPendingSocialConnectionCount(): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .eq('connection_status', 'pending_verification')
   return count ?? 0
+}
+
+// --- Admin: mission moderation ---
+
+export interface ReportedMissionSummary {
+  count: number
+  reasons: string[]
+}
+
+// One row per pending report, aggregated client-side into a per-mission
+// summary — Supabase's JS client doesn't do GROUP BY, and the pending-report
+// volume here is expected to stay small enough that this is simpler than a
+// dedicated SQL view.
+export async function getPendingReportsByMission(): Promise<Map<string, ReportedMissionSummary>> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('mission_reports').select('mission_id, reason').eq('status', 'pending')
+
+  const byMission = new Map<string, ReportedMissionSummary>()
+  for (const row of data ?? []) {
+    const existing = byMission.get(row.mission_id) ?? { count: 0, reasons: [] }
+    existing.count += 1
+    if (!existing.reasons.includes(row.reason)) existing.reasons.push(row.reason)
+    byMission.set(row.mission_id, existing)
+  }
+  return byMission
+}
+
+export async function getMissionReportsForMission(
+  missionId: string
+): Promise<Database['public']['Tables']['mission_reports']['Row'][]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('mission_reports')
+    .select('*')
+    .eq('mission_id', missionId)
+    .order('created_at', { ascending: false })
+  return data ?? []
+}
+
+export async function getPendingMissionReportsForMissions(
+  missionIds: string[]
+): Promise<Database['public']['Tables']['mission_reports']['Row'][]> {
+  if (missionIds.length === 0) return []
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('mission_reports')
+    .select('*')
+    .in('mission_id', missionIds)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+  return data ?? []
 }
