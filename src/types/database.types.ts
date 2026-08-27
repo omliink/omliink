@@ -12,6 +12,7 @@ type ProfilesRow = {
   verification_type: string | null
   is_employer: boolean
   is_candidate: boolean
+  is_admin: boolean
   account_status: string
   created_at: string
   updated_at: string
@@ -26,6 +27,7 @@ type ProfilesInsert = {
   verification_type?: string | null
   is_employer?: boolean
   is_candidate?: boolean
+  is_admin?: boolean
   account_status?: string
   created_at?: string
   updated_at?: string

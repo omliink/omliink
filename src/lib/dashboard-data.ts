@@ -506,3 +506,64 @@ export async function getInvitationsForCandidate(candidateId: string): Promise<M
     .order('created_at', { ascending: false })
   return data ?? []
 }
+
+// --- Admin ---
+// Every function below relies on the caller having already called
+// requireAdminUser() — these just query tables whose admin-facing rows are
+// only visible at all once RLS's is_admin_user() policies allow it, so a
+// non-admin session would simply get empty results back, not an error.
+
+export async function getPendingVerificationCandidates(): Promise<CandidateProfile[]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('candidate_profiles')
+    .select('*')
+    .eq('verification_status', 'pending')
+    .order('updated_at', { ascending: true })
+  return data ?? []
+}
+
+export async function getPendingVerificationCount(): Promise<number> {
+  const supabase = await createServerSupabaseClient()
+  const { count } = await supabase
+    .from('candidate_profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('verification_status', 'pending')
+  return count ?? 0
+}
+
+export async function getAllPromoCodes(): Promise<Database['public']['Tables']['promo_codes']['Row'][]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('promo_codes').select('*').order('created_at', { ascending: false })
+  return data ?? []
+}
+
+export async function getActivePromoCodeCount(): Promise<number> {
+  const supabase = await createServerSupabaseClient()
+  const { count } = await supabase
+    .from('promo_codes')
+    .select('id', { count: 'exact', head: true })
+    .eq('active', true)
+  return count ?? 0
+}
+
+export async function getPendingSocialConnections(): Promise<
+  Database['public']['Tables']['employer_social_connections']['Row'][]
+> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('employer_social_connections')
+    .select('*')
+    .eq('connection_status', 'pending_verification')
+    .order('updated_at', { ascending: true })
+  return data ?? []
+}
+
+export async function getPendingSocialConnectionCount(): Promise<number> {
+  const supabase = await createServerSupabaseClient()
+  const { count } = await supabase
+    .from('employer_social_connections')
+    .select('id', { count: 'exact', head: true })
+    .eq('connection_status', 'pending_verification')
+  return count ?? 0
+}
