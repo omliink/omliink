@@ -29,7 +29,7 @@ export default async function ProfilePage() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-10">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Mon profil</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Mon compte</h1>
         <p className="mt-1 text-sm text-gray-600">Ces informations sont visibles par vos interlocuteurs sur OMLIINK.</p>
       </div>
 

@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import MissionCard from '@/components/ui/MissionCard'
 import EmptyState from '@/components/ui/EmptyState'
+import StatusBadge from '@/components/ui/StatusBadge'
 import CategoryFilter from './CategoryFilter'
 import ActiveMissionCard from './ActiveMissionCard'
 import DistanceFilterToggle from './DistanceFilterToggle'
-import CandidateApplicationsTabs from './CandidateApplicationsTabs'
 import { haversineDistanceKm } from '@/lib/geo'
 import { parseVisioTimestamp } from '@/lib/visio-time'
 import {
@@ -119,18 +119,11 @@ export default async function CandidateDashboard({
   const invitedMissions = await getMissionsByIds(invitations.map((i) => i.mission_id))
   const invitedMissionById = new Map(invitedMissions.map((m) => [m.id, m]))
 
-  // Applications tabs: "En attente" (still live) vs "Historique" (settled).
+  // Dashboard preview only shows what's still live — the full "En attente" /
+  // "Historique" split lives on the dedicated /dashboard/candidatures page.
   const pendingApplications = myApplications.filter(
     (application) => application.status === 'pending' || application.status === 'interviewing'
   )
-  const historyApplications = myApplications.filter((application) => {
-    if (application.status === 'rejected') return true
-    if (application.status === 'hired') {
-      const mission = missionById.get(application.mission_id)
-      return mission?.status === 'completed'
-    }
-    return false
-  })
 
   return (
     <section className="flex flex-col gap-10">
@@ -141,9 +134,14 @@ export default async function CandidateDashboard({
 
       {(upcomingVisios.length > 0 || hiredActiveMissions.length > 0) && (
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">Mon agenda</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Mon agenda</h2>
+            <Link href="/dashboard/agenda" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+              Voir tout →
+            </Link>
+          </div>
           <div className="mt-4 flex flex-col gap-2">
-            {upcomingVisios.map((meeting) => {
+            {upcomingVisios.slice(0, 3).map((meeting) => {
               const mission = missionById.get(meeting.mission_id)
               return (
                 <div key={meeting.id} className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4">
@@ -168,7 +166,7 @@ export default async function CandidateDashboard({
                 </div>
               )
             })}
-            {hiredActiveMissions.map((mission) => (
+            {hiredActiveMissions.slice(0, 3).map((mission) => (
               <div key={mission.id} className="flex items-center justify-between gap-4 rounded-xl border border-gray-100 bg-white p-4">
                 <div className="min-w-0">
                   <p className="text-xs font-medium uppercase tracking-wide text-emerald-500">Mission</p>
@@ -277,12 +275,34 @@ export default async function CandidateDashboard({
         )}
       </div>
 
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">Mes candidatures</h2>
-        <div className="mt-4">
-          <CandidateApplicationsTabs pending={pendingApplications} history={historyApplications} missionById={missionById} />
+      {pendingApplications.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Mes candidatures en attente</h2>
+            <Link href="/dashboard/candidatures" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+              Voir tout →
+            </Link>
+          </div>
+          <div className="mt-4 overflow-hidden rounded-xl border border-gray-100 bg-white">
+            <ul className="divide-y divide-gray-100">
+              {pendingApplications.slice(0, 3).map((application) => {
+                const mission = missionById.get(application.mission_id)
+                return (
+                  <li key={application.id} className="flex items-center justify-between gap-4 px-5 py-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{mission?.title ?? 'Mission'}</p>
+                      <p className="text-xs text-gray-500">
+                        Candidature envoyée le {new Date(application.applied_at).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    <StatusBadge status={application.status} />
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         </div>
-      </div>
+      )}
     </section>
   )
 }

@@ -1,6 +1,8 @@
 import Link from 'next/link'
+import StatusBadge from '@/components/ui/StatusBadge'
 import ActiveMissionCard from './ActiveMissionCard'
-import EmployerMissionsTabs from './EmployerMissionsTabs'
+import EmployerMissionsGrid from './EmployerMissionsGrid'
+import EmployerCollaboratorsList from './EmployerCollaboratorsList'
 import {
   getApplicationsForMissions,
   getCategories,
@@ -12,6 +14,7 @@ import {
 } from '@/lib/dashboard-data'
 
 const PENDING_VISIO_STATUSES = new Set(['proposed', 'accepted', 'in_progress'])
+const PREVIEW_COUNT = 3
 
 interface EmployerDashboardProps {
   employerId: string
@@ -28,12 +31,19 @@ export default async function EmployerDashboard({ employerId, fullName }: Employ
     getEmployerCollaborators(employerId),
   ])
 
-  const [collaboratorProfiles, collaboratorContracts] = await Promise.all([
-    getProfilesByIds([...new Set(collaborators.map((c) => c.candidateId))]),
-    getContractsByMissionIds([...new Set(collaborators.map((c) => c.mission.id))]),
+  const recentApplications = [...applications]
+    .sort((a, b) => new Date(b.applied_at).getTime() - new Date(a.applied_at).getTime())
+    .slice(0, PREVIEW_COUNT)
+  const recentCollaborators = collaborators.slice(0, PREVIEW_COUNT)
+
+  const [collaboratorProfiles, collaboratorContracts, applicantProfiles] = await Promise.all([
+    getProfilesByIds([...new Set(recentCollaborators.map((c) => c.candidateId))]),
+    getContractsByMissionIds([...new Set(recentCollaborators.map((c) => c.mission.id))]),
+    getProfilesByIds([...new Set(recentApplications.map((a) => a.candidate_id))]),
   ])
   const profileById = new Map(collaboratorProfiles.map((p) => [p.id, p]))
   const contractByMissionId = new Map(collaboratorContracts.map((c) => [c.mission_id, c]))
+  const applicantNameById = new Map(applicantProfiles.map((p) => [p.id, p.full_name ?? p.email]))
 
   const categoryMap = new Map(categories.map((category) => [category.id, category.name]))
   const applicationsCountByMission = new Map<string, number>()
@@ -54,6 +64,9 @@ export default async function EmployerDashboard({ employerId, fullName }: Employ
 
   const missionById = new Map(missions.map((mission) => [mission.id, mission]))
   const pendingVisioMeetings = visioMeetings.filter((meeting) => PENDING_VISIO_STATUSES.has(meeting.status))
+  const recentMissions = [...missions]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, PREVIEW_COUNT)
 
   // This Server Component renders once per request — there's no re-render to
   // go stale, so the purity rule (aimed at memoized client components) does
@@ -101,12 +114,58 @@ export default async function EmployerDashboard({ employerId, fullName }: Employ
       )}
 
       <div className="mt-8">
-        <EmployerMissionsTabs
-          missions={missions}
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Mes missions</h2>
+          <Link href="/dashboard/missions" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+            Voir tout →
+          </Link>
+        </div>
+        <EmployerMissionsGrid
+          missions={recentMissions}
           categoryMap={categoryMap}
           applicationsCountByMission={applicationsCountByMission}
           hiredMissionIds={hiredMissionIds}
-          collaborators={collaborators}
+        />
+      </div>
+
+      {recentApplications.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Dernières candidatures</h2>
+            <Link href="/dashboard/candidats" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+              Voir tout →
+            </Link>
+          </div>
+          <div className="mt-4 overflow-hidden rounded-xl border border-gray-100 bg-white">
+            <ul className="divide-y divide-gray-100">
+              {recentApplications.map((application) => (
+                <li key={application.id} className="flex items-center justify-between gap-4 px-5 py-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">
+                      {applicantNameById.get(application.candidate_id) ?? 'Candidat'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {missionById.get(application.mission_id)?.title ?? 'Mission'} ·{' '}
+                      {new Date(application.applied_at).toLocaleDateString('fr-FR')}
+                    </p>
+                  </div>
+                  <StatusBadge status={application.status} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-8">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Mes intervenants</h2>
+          <Link href="/dashboard/intervenants" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+            Voir tout →
+          </Link>
+        </div>
+        <EmployerCollaboratorsList
+          collaborators={recentCollaborators}
           profileById={profileById}
           contractByMissionId={contractByMissionId}
         />

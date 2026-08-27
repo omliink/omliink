@@ -28,11 +28,23 @@ export default function DashboardShell({
   const pathname = usePathname()
   const [menuOpen, setMenuOpen] = useState(false)
 
-  const links = [
+  type NavLink = { href: string; label: string; badge?: number }
+
+  const candidateLinks: NavLink[] = [
     { href: '/dashboard', label: 'Tableau de bord' },
-    ...(profile.is_employer ? [{ href: '/dashboard/missions/new', label: 'Nouvelle mission' }] : []),
+    { href: '/dashboard/agenda', label: 'Mon agenda' },
+    { href: '/dashboard/candidatures', label: 'Mes candidatures' },
+  ]
+  const employerLinks: NavLink[] = [
+    { href: '/dashboard', label: 'Tableau de bord' },
+    { href: '/dashboard/missions', label: 'Mes missions' },
+    { href: '/dashboard/candidats', label: 'Mes candidats' },
+    { href: '/dashboard/intervenants', label: 'Mes intervenants' },
+  ]
+
+  const links: NavLink[] = [
+    ...(profile.is_candidate ? candidateLinks : profile.is_employer ? employerLinks : [{ href: '/dashboard', label: 'Tableau de bord' }]),
     { href: '/dashboard/messages', label: 'Messages', badge: unreadMessagesCount },
-    { href: '/dashboard/profile', label: 'Mon profil' },
   ]
 
   const displayName = profile.full_name ?? profile.email
@@ -63,6 +75,27 @@ export default function DashboardShell({
     </nav>
   )
 
+  // Always-visible account block, pinned to the bottom of the sidebar —
+  // replaces the earlier avatar dropdown, which testing found too easy to
+  // miss. Visually separated (top border + tinted background) from the
+  // primary nav above it.
+  const accountBlock = (
+    <div className="mt-6 flex flex-col gap-1 border-t border-gray-100 bg-gray-50 px-2 py-3 -mx-4">
+      <div className="px-2">
+        <Link
+          href="/dashboard/profile"
+          onClick={() => setMenuOpen(false)}
+          className="block rounded-lg px-1 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+        >
+          Mon compte
+        </Link>
+      </div>
+      <div className="px-2">
+        <LogoutButton />
+      </div>
+    </div>
+  )
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <aside className="hidden w-64 flex-shrink-0 flex-col justify-between border-r border-gray-100 bg-white px-4 py-6 md:flex">
@@ -75,7 +108,7 @@ export default function DashboardShell({
           </Link>
           <div className="mt-8">{navLinks}</div>
         </div>
-        <LogoutButton />
+        {accountBlock}
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -97,9 +130,9 @@ export default function DashboardShell({
           <div className="flex items-center gap-3">
             <NotificationsBell notifications={notifications} unreadCount={unreadNotificationsCount} />
             <span className="hidden text-sm font-medium text-gray-700 sm:inline">{displayName}</span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
               {initials}
-            </div>
+            </span>
           </div>
         </header>
 
@@ -128,7 +161,7 @@ export default function DashboardShell({
                 </div>
                 <div className="mt-6">{navLinks}</div>
               </div>
-              <LogoutButton />
+              {accountBlock}
             </div>
           </div>
         )}
