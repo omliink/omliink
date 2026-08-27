@@ -132,6 +132,28 @@ export async function getCandidateServiceCategoryIds(candidateId: string): Promi
   return (data ?? []).map((row) => row.category_id)
 }
 
+export async function getCandidateLanguages(
+  candidateId: string
+): Promise<Database['public']['Tables']['candidate_languages']['Row'][]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('candidate_languages').select('*').eq('candidate_id', candidateId)
+  return data ?? []
+}
+
+export async function getCandidateSupplementCodes(candidateId: string): Promise<string[]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('candidate_supplements').select('supplement_code').eq('candidate_id', candidateId)
+  return (data ?? []).map((row) => row.supplement_code)
+}
+
+export async function getCandidateSkillRows(
+  candidateId: string
+): Promise<Database['public']['Tables']['candidate_skills']['Row'][]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('candidate_skills').select('*').eq('candidate_id', candidateId)
+  return data ?? []
+}
+
 export interface SuggestedMission extends Mission {
   distanceKm: number | null
 }

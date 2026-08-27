@@ -15,12 +15,13 @@
 5. [Workflow Candidature & Visio](#workflow-candidature--visio)
 6. [Onboarding Candidat](#onboarding-candidat)
 7. [Onboarding Employeur & Gestion des Missions](#onboarding-employeur--gestion-des-missions)
-8. [Vérification Candidats](#vérification-candidats)
-9. [Statut Candidat & Paiement](#statut-candidat--paiement)
-10. [Matching Algorithm](#matching-algorithm)
-11. [Design System](#design-system)
-12. [Contraintes & Règles](#contraintes--règles)
-13. [Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté)
+8. [Mon Compte (Gestion Profil)](#mon-compte-gestion-profil)
+9. [Vérification Candidats](#vérification-candidats)
+10. [Statut Candidat & Paiement](#statut-candidat--paiement)
+11. [Matching Algorithm](#matching-algorithm)
+12. [Design System](#design-system)
+13. [Contraintes & Règles](#contraintes--règles)
+14. [Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté)
 
 ---
 
@@ -518,6 +519,36 @@ qui l'employeur a déjà travaillé pour une nouvelle mission.
 ✅ Agenda : vue des visios et missions à venir
 ✅ Onglets candidatures : "En attente" / "Historique"
 ```
+
+---
+
+## ⚙️ Mon Compte (Gestion Profil)
+
+Décision Sprint 5b : refonte de `/dashboard/profile` en blocs
+indépendamment modifiables (pattern Yoopies), remplaçant l'ancien
+formulaire monolithique à bouton "Enregistrer" unique.
+
+- Chaque bloc (Photo, Informations, Statut, Services et compétences,
+  Expérience et tarif, Bio, Mot de passe, Stripe Connect…) a sa propre
+  bascule lecture/édition et sa propre Server Action indépendante — la
+  sauvegarde d'un bloc ne touche jamais les autres.
+- Étape Photo restylée façon wizard onboarding (cadre carré + bouton "+"
+  en overlay + liste de bénéfices), réutilisant les buckets Storage et la
+  règle "pas d'`upsert:true`" déjà en place depuis le Sprint 4b.
+- **Mot de passe** : capacité de changement ajoutée (n'existait nulle
+  part avant ce sprint — le lien "mot de passe oublié" du login pointait
+  vers une route jamais construite), partagée à l'identique entre
+  candidat et employeur.
+- Les blocs candidat "Services et compétences" / "Expérience et tarif" /
+  "Bio" éditent désormais les champs du wizard Sprint 4b
+  (`bio_title`/`bio_text`, `experience_level`, `candidate_skills`…) —
+  les anciens champs `candidate_profiles.bio` / `skills` /
+  `years_experience` (pré-4b) restent en base, non supprimés, mais ne
+  sont plus édités nulle part.
+- Bloc "Mes informations" employeur limité à nom/société, nationalité,
+  téléphone : `employer_profiles` n'a pas de colonne adresse (seul
+  `candidate_profiles` en a une) — ajout volontairement écarté plutôt que
+  migré, l'adresse employeur n'étant pas un besoin établi de ce sprint.
 
 ---
 
