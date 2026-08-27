@@ -268,6 +268,43 @@ type EmployerProfilesInsert = {
 }
 type EmployerProfilesUpdate = Partial<EmployerProfilesInsert>
 
+// --- employer_social_connections ---
+type EmployerSocialConnectionsRow = {
+  id: string
+  employer_id: string
+  provider: string
+  connection_status: string
+  cesu_path: string | null
+  provider_account_number: string | null
+  date_of_birth: string | null
+  civility: string | null
+  first_name: string | null
+  last_name: string | null
+  phone: string | null
+  address: string | null
+  mandate_accepted_at: string | null
+  created_at: string
+  updated_at: string
+}
+type EmployerSocialConnectionsInsert = {
+  id?: string
+  employer_id: string
+  provider: string
+  connection_status?: string
+  cesu_path?: string | null
+  provider_account_number?: string | null
+  date_of_birth?: string | null
+  civility?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  phone?: string | null
+  address?: string | null
+  mandate_accepted_at?: string | null
+  created_at?: string
+  updated_at?: string
+}
+type EmployerSocialConnectionsUpdate = Partial<EmployerSocialConnectionsInsert>
+
 // --- service_categories ---
 type ServiceCategoriesRow = {
   id: string
@@ -625,6 +662,12 @@ export interface Database {
         Row: CandidateProfilesRow
         Insert: CandidateProfilesInsert
         Update: CandidateProfilesUpdate
+        Relationships: []
+      }
+      employer_social_connections: {
+        Row: EmployerSocialConnectionsRow
+        Insert: EmployerSocialConnectionsInsert
+        Update: EmployerSocialConnectionsUpdate
         Relationships: []
       }
       employer_profiles: {

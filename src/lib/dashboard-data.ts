@@ -207,6 +207,14 @@ export async function getEmployerProfile(userId: string): Promise<EmployerProfil
   return data
 }
 
+export async function getEmployerSocialConnections(
+  employerId: string
+): Promise<Database['public']['Tables']['employer_social_connections']['Row'][]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('employer_social_connections').select('*').eq('employer_id', employerId)
+  return data ?? []
+}
+
 export async function getCandidateProfilesByUserIds(userIds: string[]): Promise<CandidateProfile[]> {
   if (userIds.length === 0) return []
   const supabase = await createServerSupabaseClient()

@@ -11,6 +11,7 @@ import CandidateExperienceBlock from '@/components/dashboard/profile-blocks/Cand
 import CandidateBioBlock from '@/components/dashboard/profile-blocks/CandidateBioBlock'
 import EmployerInfoBlock from '@/components/dashboard/profile-blocks/EmployerInfoBlock'
 import EmployerBioBlock from '@/components/dashboard/profile-blocks/EmployerBioBlock'
+import SocialConnectionsBlock from '@/components/dashboard/profile-blocks/SocialConnectionsBlock'
 import { updateCandidatePhoto, updateEmployerPhoto } from '@/lib/actions/profile'
 import {
   getCandidateLanguages,
@@ -21,6 +22,7 @@ import {
   getCategories,
   getCurrentUser,
   getEmployerProfile,
+  getEmployerSocialConnections,
   getProfile,
   getSkillTaxonomy,
 } from '@/lib/dashboard-data'
@@ -55,6 +57,8 @@ export default async function ProfilePage() {
         getSkillTaxonomy(),
       ])
     : [[], [], [], [], [], []]
+
+  const socialConnections = profile.is_employer ? await getEmployerSocialConnections(user.id) : []
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-10">
@@ -142,6 +146,8 @@ export default async function ProfilePage() {
           />
 
           <EmployerBioBlock bio={employerProfile.bio} />
+
+          <SocialConnectionsBlock connections={socialConnections} defaultPhone={profile.phone} />
 
           <PasswordBlock />
         </section>
