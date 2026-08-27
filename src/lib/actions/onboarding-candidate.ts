@@ -143,9 +143,6 @@ export async function submitCandidateOnboarding(formData: FormData): Promise<Onb
   const { error: candidateProfileError } = await supabase.from('candidate_profiles').upsert(
     {
       user_id: user.id,
-      bio: null,
-      years_experience: null,
-      skills: null,
       languages: null,
       hourly_rate: hourlyRate,
       availability_status: 'available',

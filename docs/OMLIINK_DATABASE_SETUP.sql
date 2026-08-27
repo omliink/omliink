@@ -44,9 +44,9 @@ CREATE POLICY "Users can update their own profile"
 CREATE TABLE candidate_profiles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  bio TEXT,
-  years_experience INTEGER,
-  skills TEXT[], -- Array of skills
+  -- bio, years_experience, skills (TEXT[]) removed — pre-Sprint-4b fields,
+  -- superseded by bio_title/bio_text, experience_level, and the
+  -- candidate_skills table below. Dropped via migration (sprint cleanup).
   languages VARCHAR(100)[],
   hourly_rate DECIMAL(10, 2),
   availability_status VARCHAR(50) DEFAULT 'available', -- 'available', 'busy', 'unavailable'

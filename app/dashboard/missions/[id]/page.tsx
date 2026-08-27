@@ -12,6 +12,7 @@ import {
   getApplicationsForMission,
   getCandidateProfile,
   getCandidateProfilesByUserIds,
+  getCandidateSkillRowsForCandidates,
   getCategories,
   getContractByMissionId,
   getCurrentUser,
@@ -22,6 +23,7 @@ import {
   getMissionNeeds,
   getProfile,
   getProfilesByIds,
+  getSkillTaxonomy,
   getSuggestedCandidatesForMission,
   getVisioMeetingForCandidate,
   getVisioMeetingsByMissionIds,
@@ -67,11 +69,30 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
   const applications = isOwner ? await getApplicationsForMission(mission.id) : []
   const interviewingApplications = applications.filter((a) => a.status === 'interviewing')
   const candidateIds = applications.map((a) => a.candidate_id)
-  const [candidateProfiles, candidateExtendedProfiles] = isOwner
-    ? await Promise.all([getProfilesByIds(candidateIds), getCandidateProfilesByUserIds(candidateIds)])
-    : [[], []]
+  const [candidateProfiles, candidateExtendedProfiles, candidateSkillRows, skillTaxonomy] = isOwner
+    ? await Promise.all([
+        getProfilesByIds(candidateIds),
+        getCandidateProfilesByUserIds(candidateIds),
+        getCandidateSkillRowsForCandidates(candidateIds),
+        getSkillTaxonomy(),
+      ])
+    : [[], [], [], []]
   const candidateNameById = new Map(candidateProfiles.map((p) => [p.id, p.full_name ?? p.email]))
   const candidateProfileById = new Map(candidateExtendedProfiles.map((p) => [p.user_id, p]))
+
+  // Resolved once here (rather than threading raw skill rows + taxonomy
+  // through ApplicationsList/InterviewsList/CandidateProfileReveal) — same
+  // "find the label, fall back to the raw tag" pattern as
+  // CandidateServicesBlock's own read view.
+  const skillLabelsByCandidateId = new Map<string, string[]>()
+  for (const row of candidateSkillRows) {
+    const label =
+      skillTaxonomy.find((s) => s.category_id === row.category_id && s.skill_tag === row.skill_tag)?.label ??
+      row.skill_tag
+    const existing = skillLabelsByCandidateId.get(row.candidate_id) ?? []
+    existing.push(label)
+    skillLabelsByCandidateId.set(row.candidate_id, existing)
+  }
 
   const missionLat = mission.location_lat
   const missionLng = mission.location_lng
@@ -210,6 +231,7 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             candidateNameById={candidateNameById}
             candidateProfileById={candidateProfileById}
             distanceByCandidateId={distanceByCandidateId}
+            skillLabelsByCandidateId={skillLabelsByCandidateId}
           />
         </div>
       )}
@@ -223,6 +245,7 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             candidateNameById={candidateNameById}
             candidateProfileById={candidateProfileById}
             meetingByApplicationId={meetingByApplicationId}
+            skillLabelsByCandidateId={skillLabelsByCandidateId}
             now={now}
           />
         </div>

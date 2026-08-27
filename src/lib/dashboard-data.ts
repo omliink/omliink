@@ -155,6 +155,18 @@ export async function getCandidateSkillRows(
   return data ?? []
 }
 
+// Bulk version — employer-facing candidate reveal panels (ApplicationsList,
+// InterviewsList) need every applicant's skills in one request rather than
+// one round-trip per candidate.
+export async function getCandidateSkillRowsForCandidates(
+  candidateIds: string[]
+): Promise<Database['public']['Tables']['candidate_skills']['Row'][]> {
+  if (candidateIds.length === 0) return []
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase.from('candidate_skills').select('*').in('candidate_id', candidateIds)
+  return data ?? []
+}
+
 export interface SuggestedMission extends Mission {
   distanceKm: number | null
 }

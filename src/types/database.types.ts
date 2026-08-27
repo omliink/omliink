@@ -36,9 +36,6 @@ type ProfilesUpdate = Partial<ProfilesInsert>
 type CandidateProfilesRow = {
   id: string
   user_id: string
-  bio: string | null
-  years_experience: number | null
-  skills: string[] | null
   languages: string[] | null
   hourly_rate: number | null
   availability_status: string
@@ -70,9 +67,6 @@ type CandidateProfilesRow = {
 type CandidateProfilesInsert = {
   id?: string
   user_id: string
-  bio?: string | null
-  years_experience?: number | null
-  skills?: string[] | null
   languages?: string[] | null
   hourly_rate?: number | null
   availability_status?: string

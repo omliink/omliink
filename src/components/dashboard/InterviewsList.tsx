@@ -14,6 +14,7 @@ interface InterviewsListProps {
   candidateNameById: Map<string, string>
   candidateProfileById: Map<string, CandidateProfile>
   meetingByApplicationId: Map<string, VisioMeeting>
+  skillLabelsByCandidateId: Map<string, string[]>
   now: number
 }
 
@@ -23,6 +24,7 @@ export default function InterviewsList({
   candidateNameById,
   candidateProfileById,
   meetingByApplicationId,
+  skillLabelsByCandidateId,
   now,
 }: InterviewsListProps) {
   if (applications.length === 0) {
@@ -49,7 +51,10 @@ export default function InterviewsList({
               <InterviewActions applicationId={application.id} missionId={missionId} />
             </div>
             <div className="mt-2">
-              <CandidateProfileReveal profile={candidateProfileById.get(application.candidate_id) ?? null} />
+              <CandidateProfileReveal
+                profile={candidateProfileById.get(application.candidate_id) ?? null}
+                skillLabels={skillLabelsByCandidateId.get(application.candidate_id) ?? []}
+              />
             </div>
             {meeting ? (
               <VisioSection meeting={meeting} missionId={missionId} isEmployerViewer now={now} />

@@ -13,6 +13,7 @@ interface ApplicationsListProps {
   candidateNameById: Map<string, string>
   candidateProfileById: Map<string, CandidateProfile>
   distanceByCandidateId?: Map<string, number>
+  skillLabelsByCandidateId: Map<string, string[]>
 }
 
 function formatDistance(value: number) {
@@ -25,6 +26,7 @@ export default function ApplicationsList({
   candidateNameById,
   candidateProfileById,
   distanceByCandidateId,
+  skillLabelsByCandidateId,
 }: ApplicationsListProps) {
   if (applications.length === 0) {
     return (
@@ -53,7 +55,10 @@ export default function ApplicationsList({
               Envoyée le {new Date(application.applied_at).toLocaleDateString('fr-FR')}
             </p>
             <div className="mt-2">
-              <CandidateProfileReveal profile={candidateProfileById.get(application.candidate_id) ?? null} />
+              <CandidateProfileReveal
+                profile={candidateProfileById.get(application.candidate_id) ?? null}
+                skillLabels={skillLabelsByCandidateId.get(application.candidate_id) ?? []}
+              />
             </div>
           </div>
           <div className="flex flex-shrink-0 items-center gap-3">

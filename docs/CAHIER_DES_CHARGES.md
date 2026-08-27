@@ -543,8 +543,13 @@ formulaire monolithique à bouton "Enregistrer" unique.
   "Bio" éditent désormais les champs du wizard Sprint 4b
   (`bio_title`/`bio_text`, `experience_level`, `candidate_skills`…) —
   les anciens champs `candidate_profiles.bio` / `skills` /
-  `years_experience` (pré-4b) restent en base, non supprimés, mais ne
-  sont plus édités nulle part.
+  `years_experience` (pré-4b) restent en base à ce stade, non supprimés,
+  mais ne sont plus édités nulle part. **Mise à jour 2026-09-02** : ces
+  trois champs ont été supprimés (voir ARCHITECTURE_DATABASE.md,
+  "Champs retirés — nettoyage legacy") après vérification qu'un seul
+  usage réel restait (`CandidateProfileReveal.tsx`, corrigé pour lire les
+  champs modernes) et backfill de `bio` vers `bio_text` pour les 3 comptes
+  de test qui en dépendaient encore.
 - Bloc "Mes informations" employeur limité à nom/société, nationalité,
   téléphone : `employer_profiles` n'a pas de colonne adresse (seul
   `candidate_profiles` en a une) — ajout volontairement écarté plutôt que

@@ -4,13 +4,7 @@ import { useActionState, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import ProfileBlockCard from './ProfileBlockCard'
 import { updateCandidateExperience, type ProfileFormState } from '@/lib/actions/profile'
-
-const EXPERIENCE_LEVEL_OPTIONS = [
-  { value: 'debutant', label: 'Débutant' },
-  { value: '1-3ans', label: '1 à 3 ans d’expérience' },
-  { value: '3-5ans', label: '3 à 5 ans d’expérience' },
-  { value: '5ans-plus', label: 'Plus de 5 ans d’expérience' },
-]
+import { EXPERIENCE_LEVEL_OPTIONS } from '@/lib/experience-level'
 
 const LEGAL_MENTIONS: Record<string, string> = {
   particulier_employeur: 'Tarif net, congés payés inclus (10%).',

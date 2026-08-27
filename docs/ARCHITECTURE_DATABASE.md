@@ -354,6 +354,27 @@ candidat) et `verification-documents` (privé, même restriction de dossier ;
 revue manuelle par l'équipe via le rôle service, pas d'interface de revue
 applicative à ce stade).
 
+#### Champs retirés — nettoyage legacy (2026-09-02)
+
+`bio`, `skills` (TEXT[]) et `years_experience` — champs du tout premier
+formulaire candidat, jamais retirés quand le Sprint 4b a introduit
+`bio_title`/`bio_text`, la table `candidate_skills`, et `experience_level`.
+Vérification exhaustive du codebase avant suppression (migrations
+`20260902000000_candidate_profiles_bio_backfill.sql` puis
+`20260902000001_candidate_profiles_drop_legacy_fields.sql`) : un seul
+usage réel restait,
+`CandidateProfileReveal.tsx` (panneau employeur "Voir le profil" sur les
+candidatures/entretiens), corrigé dans le même sprint pour lire
+`bio_text`, `candidate_skills` + `skill_taxonomy`, et `experience_level` au
+lieu des champs legacy — ce qui a aussi révélé que ce composant n'avait
+jamais été mis à jour pour le wizard 4b (compétences/expérience ne
+s'affichaient déjà plus pour aucun candidat post-4b, bug préexistant
+corrigé au passage). Les 3 lignes `candidate_profiles` qui portaient
+encore des données legacy (comptes de test confirmés) ont eu leur `bio`
+recopié vers `bio_text` avant le drop ; `skills`/`years_experience` non
+migrés (formats différents de leurs équivalents modernes, pas de mapping
+1:1 pertinent pour 3 lignes de test).
+
 ---
 
 ### 3. `employer_profiles`

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import VerificationBadge from '@/components/ui/VerificationBadge'
+import { EXPERIENCE_LEVEL_LABELS } from '@/lib/experience-level'
 import type { Database } from '@/types/database.types'
 
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
@@ -11,7 +12,12 @@ const EMPLOYMENT_STATUS_LABELS: Record<string, string> = {
   auto_entrepreneur: 'Auto-entrepreneur',
 }
 
-export default function CandidateProfileReveal({ profile }: { profile: CandidateProfile | null }) {
+interface CandidateProfileRevealProps {
+  profile: CandidateProfile | null
+  skillLabels: string[]
+}
+
+export default function CandidateProfileReveal({ profile, skillLabels }: CandidateProfileRevealProps) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -42,10 +48,10 @@ export default function CandidateProfileReveal({ profile }: { profile: Candidate
                 <VerificationBadge status={profile.verification_status} />
               </div>
               {profile.bio_title && <p className="font-semibold text-gray-900">{profile.bio_title}</p>}
-              {(profile.bio_text ?? profile.bio) && <p>{profile.bio_text ?? profile.bio}</p>}
-              {profile.skills && profile.skills.length > 0 && (
+              {profile.bio_text && <p>{profile.bio_text}</p>}
+              {skillLabels.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  {profile.skills.map((skill) => (
+                  {skillLabels.map((skill) => (
                     <span key={skill} className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
                       {skill}
                     </span>
@@ -53,7 +59,9 @@ export default function CandidateProfileReveal({ profile }: { profile: Candidate
                 </div>
               )}
               <div className="flex gap-4 text-xs text-gray-500">
-                {profile.years_experience != null && <span>{profile.years_experience} an(s) d&apos;expérience</span>}
+                {profile.experience_level && (
+                  <span>{EXPERIENCE_LEVEL_LABELS[profile.experience_level] ?? profile.experience_level}</span>
+                )}
                 {profile.hourly_rate != null && <span>{profile.hourly_rate} €/h</span>}
               </div>
             </div>
