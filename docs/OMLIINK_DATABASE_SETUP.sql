@@ -1,9 +1,11 @@
 -- ========================================
 -- OMLIINK DATABASE SETUP
--- 25 Tables + RLS + Indexes + Triggers
+-- 30 Tables + RLS + Indexes + Triggers
 -- (19 tables MVP initial (18 "core" + favorite_candidates en bonus) +
---  6 tables Sprint 4a-4d — voir ARCHITECTURE_DATABASE.md pour le détail
---  par sprint)
+--  12 tables livrées post-MVP : 5 Sprint 4b (onboarding candidat), 3
+--  Sprint 4c (gestion missions employeur), 1 Sprint 5c (CESU/Pajemploi),
+--  2 Sprint 4d (abonnement Premium), 1 Sprint Modération (signalement de
+--  missions) — voir ARCHITECTURE_DATABASE.md pour le détail par sprint)
 --
 -- ⚠️ Fichier de référence du schéma CIBLE — pas une migration à exécuter.
 -- Les migrations Supabase réelles sont créées et appliquées manuellement,
@@ -27,6 +29,10 @@ CREATE TABLE profiles (
   is_employer BOOLEAN DEFAULT FALSE,
   is_candidate BOOLEAN DEFAULT FALSE,
   account_status VARCHAR(50) DEFAULT 'active', -- 'active', 'suspended', 'deleted'
+  -- Sprint Admin : rôle admin. JAMAIS modifiable par l'application — aucun
+  -- formulaire, aucune Server Action n'écrit cette colonne. Seule voie :
+  -- SQL manuel en base (Supabase SQL Editor).
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -37,6 +43,22 @@ CREATE POLICY "Users can view their own profile"
   ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update their own profile"
   ON profiles FOR UPDATE USING (auth.uid() = id);
+
+-- Sprint Admin : fonction SECURITY DEFINER réutilisée par toutes les
+-- policies RLS admin du schéma (voir chaque table concernée), plutôt que
+-- dupliquée table par table.
+CREATE OR REPLACE FUNCTION is_admin_user()
+RETURNS BOOLEAN
+LANGUAGE SQL
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT COALESCE((SELECT is_admin FROM profiles WHERE id = auth.uid()), FALSE);
+$$;
+
+CREATE POLICY "profiles_select_admin"
+  ON profiles FOR SELECT USING (is_admin_user());
 
 -- ========================================
 -- 2. CANDIDATE_PROFILES
@@ -141,6 +163,10 @@ CREATE TABLE missions (
   location_lng DECIMAL(11, 8),
   status VARCHAR(50) DEFAULT 'draft', -- 'draft', 'published', 'paused', 'matching', 'visio_scheduled', 'assigned', 'in_progress', 'completed', 'cancelled', 'disputed'
   -- 'paused' ajouté Sprint 4c : mise en pause manuelle par l'employeur
+  -- Sprint Modération : indépendant de status ci-dessus, piloté UNIQUEMENT
+  -- par l'admin. Une mission n'est visible aux candidats que si
+  -- status = 'published' ET moderation_status = 'normal'.
+  moderation_status VARCHAR(20) NOT NULL DEFAULT 'normal', -- 'normal', 'suspended', 'removed'
   mission_date DATE,
   mission_time_start TIME,
   mission_time_end TIME,
@@ -155,10 +181,32 @@ CREATE TABLE missions (
 );
 
 ALTER TABLE missions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Everyone can view published missions"
-  ON missions FOR SELECT USING (status = 'published' OR employer_id = auth.uid());
-CREATE POLICY "Employers can manage their own missions"
-  ON missions FOR ALL USING (employer_id = auth.uid());
+-- ⚠️ Historique : les deux policies de ce bloc ont longtemps été
+-- "Everyone can view published missions" (SELECT, sans condition sur
+-- moderation_status) et "Employers can manage their own missions"
+-- (FOR ALL, sans aucune condition). Nommées différemment des policies
+-- modernes introduites plus tard par les migrations réelles, elles
+-- n'ont jamais été supprimées par un `DROP POLICY IF EXISTS` et
+-- neutralisaient silencieusement moderation_status (Postgres additionne
+-- les policies permissives par OR) : un employeur pouvait rouvrir sa
+-- propre mission suspendue par appel API direct, une mission supprimée
+-- restait lisible même sans authentification. Trouvé et corrigé pendant
+-- le sprint Modération — remplacé ci-dessous par les policies
+-- effectivement live aujourd'hui. Voir ARCHITECTURE_DATABASE.md pour le
+-- détail complet de l'incident.
+CREATE POLICY "missions_select_own_or_published"
+  ON missions FOR SELECT
+  USING (auth.uid() = employer_id OR (status = 'published' AND moderation_status = 'normal'));
+CREATE POLICY "missions_select_admin"
+  ON missions FOR SELECT USING (is_admin_user());
+CREATE POLICY "missions_update_own"
+  ON missions FOR UPDATE
+  USING (auth.uid() = employer_id AND moderation_status = 'normal')
+  WITH CHECK (auth.uid() = employer_id AND moderation_status = 'normal');
+CREATE POLICY "missions_update_admin"
+  ON missions FOR UPDATE USING (is_admin_user()) WITH CHECK (is_admin_user());
+CREATE POLICY "missions_insert_own"
+  ON missions FOR INSERT WITH CHECK (auth.uid() = employer_id);
 
 -- Index for geo queries
 CREATE INDEX idx_missions_location ON missions(location_lat, location_lng);
@@ -711,6 +759,99 @@ ALTER TABLE promo_codes ENABLE ROW LEVEL SECURITY;
 CREATE INDEX idx_promo_codes_code ON promo_codes(code);
 
 -- ========================================
+-- 25. PROMO_CODE_REDEMPTIONS (Sprint 4d — abonnement Premium)
+-- ========================================
+-- Journal d'utilisation, un enregistrement par (employeur, code) — la
+-- contrainte unique rend le webhook Stripe idempotent en cas de
+-- re-livraison (l'incrément de promo_codes.current_uses n'a lieu que si
+-- l'INSERT réussit réellement). Écrit uniquement par le webhook
+-- (service_role, contourne RLS) ; la policy propriétaire existe par
+-- symétrie avec le reste du schéma, pas parce que le client écrit ici.
+CREATE TABLE promo_code_redemptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  promo_code_id UUID NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+  redeemed_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(employer_id, promo_code_id)
+);
+
+ALTER TABLE promo_code_redemptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "promo_code_redemptions_manage_own"
+  ON promo_code_redemptions FOR ALL
+  USING (employer_id = auth.uid()) WITH CHECK (employer_id = auth.uid());
+
+-- ========================================
+-- 26. EMPLOYER_SOCIAL_CONNECTIONS (Sprint 5c — coquille CESU/Pajemploi)
+-- ========================================
+-- Collecte de formulaire + traitement manuel par l'équipe uniquement.
+-- AUCUNE intégration API réelle URSSAF/CESU/Pajemploi, aucun prélèvement
+-- SEPA (phase 2, hors périmètre actuel — voir CAHIER_DES_CHARGES.md,
+-- section Statut Candidat & Paiement). Volontairement aucun IBAN/BIC
+-- collecté ce sprint (minimisation des données tant qu'aucun traitement
+-- réel n'existe).
+CREATE TABLE employer_social_connections (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  provider VARCHAR(20) NOT NULL, -- 'pajemploi', 'cesu'
+  connection_status VARCHAR(30) DEFAULT 'not_connected', -- 'not_connected', 'pending_verification', 'connected'
+  cesu_path VARCHAR(20), -- 'existing', 'new' — uniquement si provider = 'cesu'
+  provider_account_number VARCHAR(50), -- identifiant, pas un secret
+  date_of_birth DATE,
+  civility VARCHAR(10), -- 'M', 'Mme'
+  first_name VARCHAR(255),
+  last_name VARCHAR(255),
+  phone VARCHAR(30),
+  address TEXT,
+  mandate_accepted_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(employer_id, provider)
+);
+
+ALTER TABLE employer_social_connections ENABLE ROW LEVEL SECURITY;
+-- Propriétaire uniquement — aucun accès candidat, contrairement aux
+-- tables satellites candidat du Sprint 4b (rien ici n'est du contenu
+-- marketplace visible côté candidat).
+CREATE POLICY "employer_social_connections_manage_own"
+  ON employer_social_connections FOR ALL
+  USING (employer_id = auth.uid()) WITH CHECK (employer_id = auth.uid());
+CREATE POLICY "employer_social_connections_select_admin"
+  ON employer_social_connections FOR SELECT USING (is_admin_user());
+CREATE POLICY "employer_social_connections_update_admin"
+  ON employer_social_connections FOR UPDATE USING (is_admin_user()) WITH CHECK (is_admin_user());
+
+-- ========================================
+-- 27. MISSION_REPORTS (Sprint Modération — signalement de mission)
+-- ========================================
+-- Distincte de la table 16. REPORTS ci-dessus, héritée du script de setup
+-- initial, jamais câblée à aucune interface, restée inutilisée.
+CREATE TABLE mission_reports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  mission_id UUID NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+  reporter_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  reason VARCHAR(30) NOT NULL, -- 'contenu_inapproprie', 'arnaque_suspectee', 'informations_trompeuses', 'autre'
+  details TEXT,
+  status VARCHAR(20) DEFAULT 'pending', -- 'pending', 'reviewed', 'dismissed'
+  created_at TIMESTAMP DEFAULT NOW(),
+  reviewed_at TIMESTAMP,
+  reviewed_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  UNIQUE(mission_id, reporter_id)
+);
+
+ALTER TABLE mission_reports ENABLE ROW LEVEL SECURITY;
+-- Tout utilisateur authentifié peut signaler une mission (une fois) et
+-- lire ses propres signalements ; lecture/écriture complètes réservées à
+-- l'admin.
+CREATE POLICY "mission_reports_insert_own"
+  ON mission_reports FOR INSERT WITH CHECK (auth.uid() = reporter_id);
+CREATE POLICY "mission_reports_select_own"
+  ON mission_reports FOR SELECT USING (auth.uid() = reporter_id);
+CREATE POLICY "mission_reports_select_admin"
+  ON mission_reports FOR SELECT USING (is_admin_user());
+CREATE POLICY "mission_reports_update_admin"
+  ON mission_reports FOR UPDATE USING (is_admin_user()) WITH CHECK (is_admin_user());
+
+-- ========================================
 -- TRIGGERS for updated_at
 -- ========================================
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -767,9 +908,12 @@ CREATE TRIGGER reports_updated_at BEFORE UPDATE ON reports
 CREATE TRIGGER promo_codes_updated_at BEFORE UPDATE ON promo_codes
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER employer_social_connections_updated_at BEFORE UPDATE ON employer_social_connections
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ========================================
 -- DONE
 -- ========================================
 -- Database setup complete!
--- All 25 tables created with RLS, indexes, and triggers
+-- All 30 tables created with RLS, indexes, and triggers
 -- (19 tables MVP initial + 6 tables Sprint 4a-4d).

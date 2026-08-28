@@ -13,13 +13,24 @@ SEMAINES 4-6 │ Phase 2: Core Features (Missions, Matching géo, Chat)
 SEMAINES 7-8 │ Phase 3: Visio & Contrats
 SEMAINE   9  │ Phase 4: Statut Candidat & Paiements (Stripe Connect)
    +4        │ Phase 4-BIS: Candidature/Visio + Onboarding + Premium (4a-4d)
+   +4        │ Phase 4-TER: Navigation, Sécurité & Confiance (5a/Admin/
+             │              Renommage/Modération)
 SEMAINE  10  │ Phase 5: Polish & Dashboards
 SEMAINE  11  │ Phase 6: Déploiement Production
 ```
 
 **Total:** 11 semaines pour le MVP initial + 4 sprints supplémentaires
-(Phase 4-BIS, séquence 4a-4d) décidés après retour d'usage — non comptés
-dans l'estimation initiale de ~2.5 mois.
+(Phase 4-BIS, séquence 4a-4d) + 4 sprints supplémentaires (Phase 4-TER)
+décidés après retour d'usage — non comptés dans l'estimation initiale de
+~2.5 mois.
+
+> ⚠️ **Routes** : les chemins mentionnés dans les tâches/livrables
+> ci-dessous (`/employer/missions`, `/candidate/missions`, `/profile/
+> verification`, `/register/employer`, etc.) décrivent le plan initial,
+> jamais suivi tel quel — l'architecture de routes réellement livrée a
+> consolidé vers `/dashboard/*` avec rendu conditionnel par rôle. Voir
+> [ARCHITECTURE_ROUTES.md](./ARCHITECTURE_ROUTES.md) pour la structure
+> réelle.
 
 ---
 
@@ -597,7 +608,129 @@ Checkout de paiement de mission.
 - **Livrables :** Workflow entretien candidature + Onboarding candidat
   (wizard 9 étapes) + Gestion missions employeur (pause/édition) +
   Onboarding employeur enrichi + Abonnement Premium (Stripe Subscriptions)
-- **Status :** ⏳ À faire — prochaine séquence après le sprint Stripe Connect
+- **Status :** ✅ Livré
+
+---
+
+## 🧭 PHASE 4-TER — NAVIGATION, SÉCURITÉ & CONFIANCE
+
+Séquence de 4 sprints décidée après retour d'usage sur la Phase 4-BIS — pas
+dans le plan initial, prend le relais après le sprint Premium. Deux volets
+distincts : navigation (5a) puis confiance/sécurité (admin, renommage,
+modération). Détail fonctionnel dans
+[CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md) (sections Modération &
+Interface Admin) et [ARCHITECTURE_DATABASE.md](./ARCHITECTURE_DATABASE.md)
+pour le schéma. Comme d'habitude, les migrations Supabase réelles de
+chaque sprint sont créées et appliquées manuellement au moment du sprint.
+
+### Sprint 5a — Navigation par onglets
+
+**Objectif :** remplacer la navigation ad hoc par une IA à onglets
+cohérente, côté candidat et employeur.
+
+**Tâches :**
+- [x] Routes dédiées par onglet (vraies routes Next.js, pas un état
+      d'onglet côté client — pour que l'URL, le rechargement et le bouton
+      retour du navigateur se comportent normalement)
+- [x] Onglets candidat et employeur alignés sur le même pattern
+
+**Deliverables :**
+- Navigation à onglets (candidat + employeur) ✅
+
+---
+
+### Sprint Admin — Interface admin minimale
+
+**Objectif :** donner à l'équipe OMLIINK un premier outil d'administration,
+sans jamais permettre à l'application elle-même d'accorder ce rôle.
+
+**Tâches :**
+- [x] `profiles.is_admin` (défaut `false`) — aucune Server Action, aucun
+      formulaire ne l'écrit ; uniquement modifiable manuellement en base
+- [x] `is_admin_user()` (SECURITY DEFINER), réutilisée par toutes les
+      nouvelles policies RLS admin plutôt que dupliquée
+- [x] `requireAdminUser()` — revérifie le rôle depuis la base à chaque
+      appel, jamais mis en cache ni fait confiance à un état client
+- [x] 5 pages : tableau de bord (compteurs), vérifications candidat (URL
+      signée sur le bucket privé, approbation/rejet), codes promo (CRUD,
+      désactivation), CESU/Pajemploi (marquage "connecté" manuel), missions
+      (scaffold de navigation à ce stade — complété par le sprint
+      Modération ci-dessous)
+
+**Deliverables :**
+- `profiles.is_admin` + `is_admin_user()` + `requireAdminUser()` ✅
+- 5 pages admin ✅
+
+---
+
+### Sprint Renommage — Chemin admin non public
+
+**Objectif :** défense en profondeur — réduire l'exposition de
+l'interface admin aux scans automatisés de chemins connus.
+
+**Tâches :**
+- [x] Déplacement de l'interface admin vers un chemin non public,
+      **jamais committé en clair dans un fichier versionné**, communiqué
+      séparément à l'équipe
+- [x] Ancien chemin : 404 pur pour tout le monde, y compris un admin
+      légitime — ni redirection, ni indice que la route ait existé
+- [x] Constante centrale pour le chemin admin (une seule source de vérité,
+      plus jamais codé en dur ailleurs)
+
+**Deliverables :**
+- Chemin admin non public ✅
+- Ancien chemin renvoyant un 404 propre ✅
+
+> ⚠️ Ceci est de l'obscurité, pas le contrôle d'accès réel —
+> `is_admin_user()` (SECURITY DEFINER, vérifié côté serveur et via RLS)
+> reste l'unique vraie défense, totalement inchangée par ce renommage.
+
+---
+
+### Sprint Modération — Modération des missions
+
+**Objectif :** signalement par les utilisateurs + actions admin
+(suspension réversible / suppression définitive), séparées du statut
+`missions.status` piloté par l'employeur.
+
+**Tâches :**
+- [x] Migration `missions.moderation_status` (`normal`/`suspended`/
+      `removed`), indépendant de `missions.status`
+- [x] Nouvelle table `mission_reports` (signalement, un par utilisateur et
+      par mission, motif + détails optionnels)
+- [x] Filtrage `moderation_status = 'normal'` appliqué partout où des
+      missions sont listées côté candidat (recherche, missions suggérées,
+      tri de priorité Premium du Sprint 4d)
+- [x] Blocage serveur des actions employeur (éditer/pause/réactiver) tant
+      que `moderation_status != 'normal'` — pas seulement caché côté UI
+- [x] Page admin Missions : file de signalements + suspendre/réactiver/
+      supprimer, avec blocage de la suppression si candidature `hired`
+      (contrat déjà généré) et rejet automatique des candidatures actives
+      sinon
+- [x] **Correctif RLS trouvé pendant les tests de ce sprint** : deux
+      policies héritées du tout premier script de mise en place de la
+      base (nommées différemment des policies modernes, donc jamais
+      remplacées par les migrations suivantes) neutralisaient
+      silencieusement `moderation_status` par appel API direct. Détecté
+      par test RLS direct, corrigé, re-vérifié
+- [x] **Correctif de suivi** : la liste admin des missions ne montrait que
+      les missions `status = 'published'`, rendant invisible (sauf
+      signalement préalable) toute mission dans un autre état — complétée
+      avec la liste complète, un filtre par statut et une recherche
+
+**Deliverables :**
+- Migration `missions.moderation_status` + table `mission_reports` ✅
+- Filtrage moderation_status côté candidat (partout) ✅
+- Blocage serveur des actions employeur sur mission modérée ✅
+- Page admin Missions complète (signalements + actions + liste totale) ✅
+- Correctif RLS (policies legacy neutralisant moderation_status) ✅
+
+---
+
+### Phase 4-TER Summary
+- **Livrables :** Navigation à onglets + Interface admin + Chemin admin
+  non public + Modération des missions (avec correctif RLS)
+- **Status :** ✅ Livré
 
 ---
 
@@ -786,9 +919,10 @@ Checkout de paiement de mission.
 | **3** | 7-8 | 55 | Visio + Contrats |
 | **4** | 9 | 50 | Statut Candidat + Paiements (Stripe Connect) |
 | **4-BIS** | +4 sprints | — | Candidature/Visio + Onboarding + Premium (4a-4d) |
+| **4-TER** | +4 sprints | — | Navigation + Admin + Renommage + Modération |
 | **5** | 10 | 50 | Dashboards + Polish |
 | **6** | 11 | 40 | Production + Launch |
-| **TOTAL** | **11 + 4 sprints** | **435 +** | **MVP Complet + Phase 4-BIS** |
+| **TOTAL** | **11 + 8 sprints** | **435 +** | **MVP Complet + Phase 4-BIS + Phase 4-TER** |
 
 ---
 
@@ -800,7 +934,8 @@ Fin Semaine 3:    ✅ Auth fonctionnelle + Landing
 Fin Semaine 6:    ✅ Core features (Missions + Matching géo + Chat)
 Fin Semaine 8:    ✅ Visio + Contrats
 Fin Semaine 9:    ✅ Statut Candidat + Paiements (Stripe Connect)
-Fin Sprint 4a-4d: ⏳ Candidature/Visio + Onboarding + Premium (à faire)
+Fin Sprint 4a-4d: ✅ Candidature/Visio + Onboarding + Premium
+Fin Sprint 4-TER: ✅ Navigation + Admin + Renommage + Modération
 Fin Semaine 10:   ✅ Dashboards + Polish
 Fin Semaine 11:   🚀 Production Launch
 ```

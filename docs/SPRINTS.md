@@ -8,6 +8,13 @@
 
 ## 📋 Vue d'Ensemble Sprints
 
+> ⚠️ **Routes** : les chemins mentionnés dans les tâches/deliverables de ce
+> fichier (`/employer/missions`, `/candidate/missions`, `/profile/
+> verification`, `/register/employer`, etc.) décrivent le plan initial,
+> jamais suivi tel quel — voir
+> [ARCHITECTURE_ROUTES.md](./ARCHITECTURE_ROUTES.md) pour la structure de
+> routes réellement livrée (`/dashboard/*`, rendu conditionnel par rôle).
+
 ```
 SPRINT  0 │ Setup (Semaine 1)
 SPRINT  1 │ Database & Auth (Semaine 2)
@@ -35,6 +42,12 @@ SPRINT 4a │ Refonte Workflow Candidature/Visio (post-MVP)
 SPRINT 4b │ Onboarding Candidat — Wizard 9 étapes (post-MVP)
 SPRINT 4c │ Gestion Missions Employeur & Onboarding Enrichi (post-MVP)
 SPRINT 4d │ Abonnement Premium (Stripe Subscriptions + Promo) (post-MVP)
+─────────────────────────────────────────────────────
+SPRINT 5a │ Navigation par onglets (post-MVP)
+SPRINT AD │ Interface admin minimale (post-MVP)
+SPRINT AR │ Renommage du chemin admin — défense en profondeur (post-MVP)
+SPRINT MOD│ Modération des missions + correctif RLS + correctif liste admin
+          │ (post-MVP)
 ```
 
 ---
@@ -466,6 +479,47 @@ SPRINT 4d │ Abonnement Premium
 
 ---
 
+## 🧭 SPRINTS 5a, Admin & Modération — Navigation, Sécurité & Confiance
+
+Séquence décidée après retour d'usage sur la Phase 4-BIS — pas dans le
+plan initial, ajoutée au fil des besoins réels (navigation, puis
+confiance/sécurité). Détail complet dans
+[FEUILLE_DE_ROUTE.md](./FEUILLE_DE_ROUTE.md#phase-4-ter--navigation-sécurité--confiance).
+
+```
+SPRINT 5a  │ Navigation par onglets
+           │ Objectif : IA à onglets pour candidat et employeur (routes
+           │            dédiées, pas un état d'onglet côté client)
+
+SPRINT AD  │ Interface admin minimale
+           │ Objectif : rôle is_admin (jamais modifiable par l'app),
+           │            5 pages (tableau de bord, vérifications, codes
+           │            promo, CESU/Pajemploi, missions — scaffold à ce
+           │            stade), is_admin_user() SECURITY DEFINER réutilisée
+           │            partout
+
+SPRINT AR  │ Renommage du chemin admin
+           │ Objectif : défense en profondeur — chemin non public (jamais
+           │            committé en clair), 404 pur sur l'ancien chemin
+           │            pour tout le monde y compris un admin légitime.
+           │            N'affecte en rien le vrai contrôle d'accès
+           │            (is_admin_user() + RLS), qui reste inchangé
+
+SPRINT MOD │ Modération des missions
+           │ Objectif : missions.moderation_status indépendant de
+           │            missions.status, table mission_reports
+           │            (signalement par tout utilisateur), page admin
+           │            Missions complétée (file de signalements +
+           │            suspendre/réactiver/supprimer), + un correctif
+           │            RLS trouvé et corrigé pendant les tests de ce
+           │            sprint (deux policies legacy sur `missions`
+           │            neutralisaient silencieusement moderation_status),
+           │            + un correctif de suivi sur la liste admin
+           │            (n'affichait que les missions 'published')
+```
+
+---
+
 ## 📝 Format Standard pour Sprints 4-20
 
 ### Pour chaque sprint suivant:
@@ -566,9 +620,11 @@ Build Time: < 30s
 
 ---
 
-**Total Sprints:** 20 (MVP initial) + 4 (Sprints 4a-4d, post-MVP)  
-**Total Heures:** ~435h (11 semaines) + Phase 4-BIS  
+**Total Sprints:** 20 (MVP initial) + 4 (Sprints 4a-4d, post-MVP) + 4
+(Sprints 5a/Admin/Renommage/Modération, post-MVP)  
+**Total Heures:** ~435h (11 semaines) + Phase 4-BIS + Phase 4-TER  
 **Livrable:** OMLIINK MVP en production, puis refonte candidature/onboarding
-+ monétisation hybride
++ monétisation hybride, puis navigation à onglets + interface admin +
+modération des missions
 
 Voir FEUILLE_DE_ROUTE.md pour vue complète.

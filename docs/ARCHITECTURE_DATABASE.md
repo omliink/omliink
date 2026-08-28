@@ -18,9 +18,11 @@
 
 ## 👁️ Vue d'Ensemble
 
-**18 tables principales:**
+**18 tables MVP initial + 12 tables livrées en post-MVP = 30 tables au total :**
 
 ```
+MVP initial (18) :
+
 Authentification & Profils (3):
   - auth.users (Supabase)
   - profiles
@@ -55,13 +57,16 @@ Autres (1):
   - documents
 ```
 
-> 🆕 **Schéma cible post Sprint 4a-4d** (+6 tables, voir détail dans
-> chaque section concernée) :
+> ✅ **Livré post-MVP** (+12 tables, voir détail dans chaque section
+> concernée ainsi que dans [Migrations](#migrations)) :
 > `candidate_languages`, `candidate_service_types`, `candidate_supplements`,
-> `skill_taxonomy`, `candidate_skills` (Sprint 4b — onboarding candidat),
-> `promo_codes` (Sprint 4d — abonnement Premium). Non créées à ce stade —
-> migrations réelles créées et appliquées manuellement sprint par sprint,
-> voir [Migrations](#migrations).
+> `skill_taxonomy`, `candidate_skills` (Sprint 4b — onboarding candidat) ·
+> `mission_need_taxonomy`, `mission_needs`, `mission_invitations`
+> (Sprint 4c — gestion missions employeur) ·
+> `employer_social_connections` (Sprint 5c — coquille CESU/Pajemploi) ·
+> `promo_codes`, `promo_code_redemptions` (Sprint 4d — abonnement Premium) ·
+> `mission_reports` (Sprint Modération — signalement de missions, distinct
+> de la table `reports` du MVP initial, restée inutilisée).
 
 ---
 
@@ -123,6 +128,38 @@ CREATE INDEX idx_profiles_email ON profiles(email);
 CREATE INDEX idx_profiles_role ON profiles(role);
 CREATE INDEX idx_profiles_verified ON profiles(id_verified);
 ```
+
+#### Champ ajouté — `is_admin` (Sprint Admin, livré)
+
+```sql
+alter table public.profiles
+  add column if not exists is_admin boolean not null default false;
+```
+
+Rôle admin — voir [CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md#modération--interface-admin)
+pour le détail fonctionnel. Points clés côté schéma :
+- **Jamais modifiable par l'application** : aucune Server Action, aucun
+  formulaire n'écrit cette colonne — uniquement en SQL manuel (Supabase SQL
+  Editor).
+- Vérifié via `is_admin_user()`, fonction `SECURITY DEFINER` :
+  ```sql
+  create or replace function public.is_admin_user()
+  returns boolean
+  language sql
+  security definer
+  set search_path = public
+  stable
+  as $$
+    select coalesce((select is_admin from public.profiles where id = auth.uid()), false);
+  $$;
+  ```
+- Réutilisée par toutes les policies RLS admin (`profiles_select_admin`,
+  `candidate_profiles_select/update_admin`,
+  `employer_social_connections_select/update_admin`,
+  `promo_codes_insert/update_admin`, `missions_select/update_admin`,
+  `applications_select/update_admin`, `mission_reports_select/update_admin`,
+  la policy de lecture admin sur `storage.objects` pour le bucket privé
+  `verification-documents`) plutôt que dupliquée table par table.
 
 ---
 
@@ -193,7 +230,7 @@ CREATE INDEX idx_candidate_profiles_verification_level ON candidate_profiles(ver
 > de migration correspondant (à exécuter tel quel dans Supabase) est donné
 > plus bas dans [Migrations](#migrations).
 
-#### Champ ajouté — `employment_status` (à exécuter maintenant)
+#### Champ ajouté — `employment_status` (Sprint 12, livré)
 
 Un candidat porte un statut légal/fiscal, **sur la table `candidate_profiles`
 existante** (pas de table séparée : les deux statuts partagent la même
@@ -223,12 +260,13 @@ employment_status TEXT NOT NULL DEFAULT 'particulier_employeur'
 > candidats des deux statuts, un candidat de n'importe quel statut voit
 > toutes les missions publiées) — `employment_status` n'est affiché que
 > comme information sur le profil et ne détermine que le mode de paiement en
-> fin de cycle (Sprint paiements à venir).
+> fin de cycle (Stripe Connect, livré — voir Statut Candidat & Paiement dans
+> CAHIER_DES_CHARGES.md).
 
-#### Champs futurs — matching géographique (pour plus tard, pas ce sprint)
+#### Champs livrés — matching géographique (Sprint 7)
 
-Pour le sprint de matching géographique à venir (tri/filtre par distance —
-voir [CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md#matching-algorithm)) :
+Tri/filtre par distance (formule haversine — voir
+[CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md#matching-algorithm)) :
 
 ```sql
 location_lat  DOUBLE PRECISION  -- adresse de référence du candidat,
@@ -565,6 +603,43 @@ CREATE INDEX idx_missions_geo ON missions(address_lat, address_lng);
 CREATE INDEX idx_missions_employer ON missions(employer_id);
 CREATE INDEX idx_missions_date ON missions(mission_date);
 ```
+
+#### Champ ajouté — `moderation_status` (Sprint Modération, livré)
+
+```sql
+alter table public.missions
+  add column if not exists moderation_status varchar(20) not null default 'normal';
+  -- 'normal' | 'suspended' | 'removed'
+```
+
+**Indépendant** de `missions.status` ci-dessus (piloté par l'employeur) —
+piloté uniquement par l'admin. Voir
+[CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md#modération--interface-admin)
+pour le détail fonctionnel (visibilité candidat, blocage des actions
+employeur, suppression bloquée si `hired`, etc.).
+
+> ⚠️ **Incident RLS trouvé et corrigé pendant ce sprint** : deux policies
+> héritées d'`OMLIINK_DATABASE_SETUP.sql` — `"Everyone can view published
+> missions"` (SELECT, sans condition sur `moderation_status`) et
+> `"Employers can manage their own missions"` (`FOR ALL`, sans aucune
+> condition) — portaient un nom différent des policies modernes
+> (`missions_select_own_or_published`, `missions_update_own`), donc aucun
+> `drop policy if exists` des migrations suivantes ne les a jamais
+> supprimées. Elles sont restées actives en parallèle et, Postgres
+> additionnant les policies permissives par OR, neutralisaient
+> silencieusement `moderation_status` : un employeur pouvait rouvrir sa
+> propre mission suspendue par un appel API direct, et une mission
+> supprimée restait lisible même sans authentification. Confirmé
+> exploitable par test direct (PATCH/GET bruts contre PostgREST, hors
+> application), puis les deux anciennes policies ont été supprimées :
+> ```sql
+> drop policy if exists "Employers can manage their own missions" on public.missions;
+> drop policy if exists "Everyone can view published missions" on public.missions;
+> ```
+> Un audit complet de `pg_policies` sur tout le schéma a suivi pour
+> vérifier qu'aucune autre table n'avait un problème équivalent — aucune
+> autre policy héritée du script de setup initial ne s'est avérée plus
+> permissive que son remplacement moderne.
 
 ---
 
@@ -1122,6 +1197,168 @@ CREATE INDEX idx_visio_feedback_meeting ON visio_feedback(meeting_id);
 
 ---
 
+### 19. `mission_need_taxonomy` (Sprint 4c, livré)
+
+**Référentiel public des sous-types de besoin, par catégorie de service**
+— même rôle que `skill_taxonomy` (Sprint 4b) côté candidat, mais
+vocabulaire séparé (besoin employeur, ex. "Auxiliaire de vie", vs
+compétence candidat, ex. "Aide à la toilette"). Lecture publique, seedé
+uniquement par migration.
+
+```sql
+CREATE TABLE mission_need_taxonomy (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category_id UUID NOT NULL REFERENCES service_categories(id) ON DELETE CASCADE,
+  need_tag VARCHAR(100) NOT NULL,
+  label VARCHAR(255) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(category_id, need_tag)
+);
+```
+
+52 tags seedés (migration `20260830010000_sprint4c_mission_need_taxonomy_seed.sql`).
+
+---
+
+### 20. `mission_needs` (Sprint 4c, livré)
+
+**Sous-typage du besoin choisi par l'employeur pour une mission donnée** —
+FK composite vers `mission_need_taxonomy(category_id, need_tag)` (même
+garde-fou d'intégrité que `candidate_skills` en Sprint 4b : empêche
+d'associer un tag à la mauvaise catégorie). Géré par l'employeur
+propriétaire de la mission uniquement.
+
+```sql
+CREATE TABLE mission_needs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  mission_id UUID NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+  category_id UUID NOT NULL,
+  need_tag VARCHAR(100) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(mission_id, need_tag),
+  FOREIGN KEY (category_id, need_tag) REFERENCES mission_need_taxonomy(category_id, need_tag) ON DELETE CASCADE
+);
+```
+
+---
+
+### 21. `mission_invitations` (Sprint 4c, livré)
+
+**Invitation à candidater**, envoyée par l'employeur à un candidat
+compatible suggéré après publication d'une mission — jamais un contact
+direct libre (voir
+[Ce Qui Est Explicitement Écarté](./CAHIER_DES_CHARGES.md#ce-qui-est-explicitement-écarté)
+dans CAHIER_DES_CHARGES.md).
+
+```sql
+CREATE TABLE mission_invitations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  mission_id UUID NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+  candidate_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  -- 'pending', 'viewed', 'applied', 'declined'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(mission_id, candidate_id)
+);
+```
+
+---
+
+### 22. `employer_social_connections` (Sprint 5c, livré)
+
+**Coquille CESU/Pajemploi** — collecte de formulaire + traitement manuel
+par l'équipe uniquement. **Aucune intégration API réelle URSSAF/CESU/
+Pajemploi, aucun prélèvement SEPA** (voir
+[Statut Candidat & Paiement](./CAHIER_DES_CHARGES.md#statut-candidat--paiement)
+dans CAHIER_DES_CHARGES.md — phase 2, hors périmètre actuel).
+Volontairement **aucun IBAN/BIC collecté** ce sprint (décision validée
+avant migration — minimisation des données tant qu'aucun traitement réel
+n'existe).
+
+```sql
+CREATE TABLE employer_social_connections (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  provider VARCHAR(20) NOT NULL, -- 'pajemploi' | 'cesu'
+  connection_status VARCHAR(30) NOT NULL DEFAULT 'not_connected',
+  -- 'not_connected' | 'pending_verification' | 'connected'
+  cesu_path VARCHAR(20), -- 'existing' | 'new' — uniquement si provider = 'cesu'
+  provider_account_number VARCHAR(50), -- identifiant, pas un secret
+  date_of_birth DATE,
+  civility VARCHAR(10), -- 'M' | 'Mme'
+  first_name VARCHAR(255),
+  last_name VARCHAR(255),
+  phone VARCHAR(30),
+  address TEXT,
+  mandate_accepted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(employer_id, provider)
+);
+```
+
+RLS : propriétaire uniquement (`employer_id = auth.uid()`, `FOR ALL`) —
+aucun accès candidat, contrairement aux tables satellites candidat du
+Sprint 4b (rien ici n'est du contenu marketplace visible côté candidat).
+Traitement manuel : l'équipe revoit directement en base les lignes
+`connection_status = 'pending_verification'`, puis les marque `connected`
+depuis la page admin CESU/Pajemploi.
+
+---
+
+### 23. `mission_reports` (Sprint Modération, livré)
+
+**Signalement de mission par un utilisateur** — distinct de la table `16.
+reports` ci-dessus, qui date du script de setup initial, n'a jamais été
+câblée à aucune interface, et reste inutilisée.
+
+```sql
+CREATE TABLE mission_reports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  mission_id UUID NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+  reporter_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  reason VARCHAR(30) NOT NULL,
+  -- 'contenu_inapproprie' | 'arnaque_suspectee' | 'informations_trompeuses' | 'autre'
+  details TEXT,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending', -- 'pending' | 'reviewed' | 'dismissed'
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  reviewed_at TIMESTAMPTZ,
+  reviewed_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  UNIQUE(mission_id, reporter_id)
+);
+```
+
+RLS : tout utilisateur authentifié peut signaler une mission (une fois,
+contrainte unique `mission_id`+`reporter_id`) et lire ses propres
+signalements ; lecture/écriture complètes réservées à l'admin
+(`is_admin_user()`). Voir
+[CAHIER_DES_CHARGES.md](./CAHIER_DES_CHARGES.md#modération--interface-admin)
+pour le workflow complet (suspension, suppression, dismissal).
+
+---
+
+### 24. `promo_code_redemptions` (Sprint 4d, livré)
+
+**Journal d'utilisation des codes promo**, un enregistrement par
+(employeur, code) — la contrainte unique rend le webhook Stripe idempotent
+en cas de re-livraison (l'incrément de `promo_codes.current_uses` n'a
+lieu que si l'INSERT réussit réellement). Écrit uniquement par le webhook
+(`service_role`, contourne RLS) ; la policy propriétaire existe par
+symétrie avec le reste du schéma, pas parce que le client écrit ici
+directement.
+
+```sql
+CREATE TABLE promo_code_redemptions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  promo_code_id UUID NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+  redeemed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(employer_id, promo_code_id)
+);
+```
+
+---
+
 ## 🔒 RLS Policies
 
 ### Stratégie Générale
@@ -1251,7 +1488,7 @@ EXECUTE FUNCTION update_timestamp();
   └─ Créer triggers updated_at
 ```
 
-### Migration — `employment_status` (à exécuter maintenant)
+### Migration — `employment_status` (Sprint 12, livré)
 
 Basée sur le schéma réellement déployé (`candidate_profiles` existe déjà
 avec `id`, `user_id`, `bio`, `years_experience`, `skills`, `languages`,
@@ -1269,11 +1506,10 @@ alter table public.candidate_profiles
   check (employment_status in ('particulier_employeur', 'auto_entrepreneur'));
 ```
 
-### Migration — champs de localisation candidat (pour plus tard, sprint matching géographique)
+### Migration — champs de localisation candidat (Sprint 7, livré)
 
 ```sql
--- supabase/migrations/<timestamp>_candidate_location_matching.sql
--- NE PAS exécuter avant le sprint de matching géographique.
+-- supabase/migrations/20260826000000_candidate_location_matching.sql
 
 alter table public.candidate_profiles
   add column if not exists location_lat double precision,
@@ -1281,28 +1517,63 @@ alter table public.candidate_profiles
   add column if not exists radius_km integer not null default 20;
 ```
 
-### Migrations — Sprints 4a-4d (pas maintenant)
+### Migrations — Sprints 4a-4d, 4-TER (livrées)
 
-Cette mise à jour de documentation ne crée **aucune migration réelle**.
-Comme pour les sprints précédents, les migrations SQL seront rédigées et
-appliquées manuellement au moment de chacun des sprints suivants (voir
+Toutes les migrations listées ci-dessous ont été rédigées et appliquées
+manuellement au moment de chaque sprint (voir
 [FEUILLE_DE_ROUTE.md](./FEUILLE_DE_ROUTE.md) et
-[SPRINTS.md](./SPRINTS.md)) :
+[SPRINTS.md](./SPRINTS.md) pour le détail fonctionnel) :
 
 ```
-Sprint 4a → réécriture des valeurs applications.status
-            (pending/interviewing/hired/rejected)
-Sprint 4b → colonnes candidate_profiles (gender, birth_date, birth_place,
-            native_language, phone_visible, photo_url, experience_level,
-            bio_title, bio_text, verification_status,
-            verification_document_url) + tables candidate_languages,
-            candidate_service_types, candidate_supplements,
-            skill_taxonomy, candidate_skills
-Sprint 4c → ajout du statut 'paused' sur missions
-Sprint 4d → colonnes employer_profiles (subscription_tier,
-            subscription_status, stripe_subscription_id) + table
-            promo_codes
+Sprint 4a  → réécriture des valeurs applications.status
+             (pending/interviewing/hired/rejected)
+             20260828120000_sprint4a_parallel_interviews.sql
+
+Sprint 4b  → colonnes candidate_profiles (gender, birth_date, birth_place,
+             native_language, phone_visible, photo_url, experience_level,
+             bio_title, bio_text, verification_status,
+             verification_document_url) + tables candidate_languages,
+             candidate_service_types, candidate_supplements,
+             skill_taxonomy, candidate_skills
+             20260829000000_sprint4b_candidate_wizard_schema.sql
+             20260829010000_sprint4b_skill_taxonomy_seed.sql
+             20260829020000_sprint4b_storage_buckets.sql
+
+Sprint 4c  → ajout du statut 'paused' sur missions (pas de migration —
+             VARCHAR sans CHECK, valeur applicative uniquement) + tables
+             mission_need_taxonomy, mission_needs, mission_invitations +
+             employer_profiles.nationality
+             20260830000000_sprint4c_mission_management_schema.sql
+             20260830010000_sprint4c_mission_need_taxonomy_seed.sql
+             20260830020000_sprint4c_employer_photo.sql
+             20260830030000_sprint4c_employer_public_info.sql
+
+Sprint 5c  → table employer_social_connections (coquille CESU/Pajemploi)
+             20260831000000_sprint5c_employer_social_connections.sql
+
+Sprint 4d  → colonnes employer_profiles (subscription_tier,
+             subscription_status, stripe_subscription_id,
+             subscription_current_period_end) + tables promo_codes,
+             promo_code_redemptions
+             20260901000000_sprint4d_premium_subscription.sql
+
+Sprint Admin     → profiles.is_admin + is_admin_user() + policies RLS
+                   admin sur profiles/candidate_profiles/
+                   employer_social_connections/promo_codes/
+                   storage.objects (verification-documents)
+                   20260903000000_admin_role_and_permissions.sql
+
+Sprint Modération → missions.moderation_status + table mission_reports +
+                    policies RLS admin sur missions/applications +
+                    correctif RLS (suppression des deux policies legacy
+                    neutralisant moderation_status, voir la note dans la
+                    section `missions` ci-dessus)
+                    20260904000000_mission_moderation.sql
 ```
+
+Le renommage du chemin admin (défense en profondeur) et le correctif de
+la liste admin des missions (afficher tous les statuts, pas seulement
+`published`) sont des changements applicatifs sans migration associée.
 
 `OMLIINK_DATABASE_SETUP.sql` (racine `docs/`) a été mis à jour en
 parallèle pour refléter ce schéma cible dans son ensemble — c'est un

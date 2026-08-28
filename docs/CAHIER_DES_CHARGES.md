@@ -17,11 +17,12 @@
 7. [Onboarding Employeur & Gestion des Missions](#onboarding-employeur--gestion-des-missions)
 8. [Mon Compte (Gestion Profil)](#mon-compte-gestion-profil)
 9. [Vérification Candidats](#vérification-candidats)
-10. [Statut Candidat & Paiement](#statut-candidat--paiement)
-11. [Matching Algorithm](#matching-algorithm)
-12. [Design System](#design-system)
-13. [Contraintes & Règles](#contraintes--règles)
-14. [Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté)
+10. [Modération & Interface Admin](#modération--interface-admin)
+11. [Statut Candidat & Paiement](#statut-candidat--paiement)
+12. [Matching Algorithm](#matching-algorithm)
+13. [Design System](#design-system)
+14. [Contraintes & Règles](#contraintes--règles)
+15. [Ce Qui Est Explicitement Écarté](#ce-qui-est-explicitement-écarté)
 
 ---
 
@@ -150,12 +151,12 @@ l'argent.
   le plus proche du besoin réel de nombreux employeurs (emploi déclaré
   classique)
 
-### Sprint 4d — Abonnement Premium employeur (planifié)
+### Sprint 4d — Abonnement Premium employeur (livré)
 
 Décision : passer d'un modèle purement transactionnel à un modèle
 **hybride** — la commission 10% reste le revenu principal, l'abonnement
-Premium devient un revenu secondaire, activement planifié (Sprint 4d),
-pas une simple piste future.
+Premium devient un revenu secondaire, livré et testé (Sprint 4d), pas une
+simple piste future.
 
 **Abonnement Premium — 10€/mois fixe**
 - Missions actives illimitées en simultané (**gratuit : limité à 1-2
@@ -599,6 +600,106 @@ formulaire monolithique à bouton "Enregistrer" unique.
 
 ---
 
+## 🛡️ Modération & Interface Admin
+
+Décision post-MVP (sprint admin, puis sprint modération des missions) : une
+interface d'administration existe, réservée à l'équipe OMLIINK — de la
+modération **manuelle**, pas automatique, exercée par un rôle admin humain.
+
+### Rôle admin
+
+```
+profiles.is_admin (boolean, défaut false)
+```
+- Jamais modifiable par l'application — aucun formulaire, aucune Server
+  Action n'écrit cette colonne. Seule voie : une requête SQL manuelle en
+  base (SQL Editor Supabase), exécutée par l'équipe.
+- Vérifié via `is_admin_user()` (fonction SECURITY DEFINER), réutilisée par
+  toutes les policies RLS admin plutôt que dupliquée table par table.
+- Côté application, `requireAdminUser()` revérifie ce rôle depuis la base à
+  chaque appel (jamais mis en cache, jamais fait confiance à un état
+  client) — chaque page et chaque Server Action admin repasse par cette
+  vérification indépendamment.
+
+### Chemin d'accès
+
+L'interface admin vit sur un chemin **non public, communiqué séparément,
+jamais committé dans un fichier versionné** — mesure de défense en
+profondeur (obscurité), distincte et indépendante du vrai contrôle d'accès
+(`is_admin_user()` + RLS). L'ancien chemin d'origine renvoie désormais un
+404 pur pour tout le monde, y compris un admin légitime — ni redirection,
+ni indice que la route ait jamais existé ailleurs.
+
+### Les 5 pages
+
+1. **Tableau de bord** — compteurs (vérifications en attente, demandes
+   CESU/Pajemploi en attente, codes promo actifs)
+2. **Vérifications** — revue des documents d'identité candidat (URL
+   signée, 5 minutes, sur le bucket privé `verification-documents`),
+   approbation/rejet avec motif, notification au candidat
+3. **Codes promo** — création, désactivation (`active = false`, jamais de
+   suppression pour garder `promo_code_redemptions` cohérent)
+4. **CESU / Pajemploi** — marquage "connecté" une fois qu'une demande a été
+   traitée manuellement par l'équipe hors application (voir
+   [Statut Candidat & Paiement](#statut-candidat--paiement) — aucune
+   donnée bancaire n'y transite, décision Sprint 5c)
+5. **Missions** — modération : file des missions signalées (motif, nombre,
+   lien direct) en tête de liste, puis la liste complète de toutes les
+   missions tous statuts confondus (recherche par titre/employeur, filtre
+   par statut). Actions : suspendre / réactiver / supprimer définitivement,
+   réservées à l'admin et totalement indépendantes du statut
+   `missions.status` piloté par l'employeur (voir ci-dessous)
+
+### Modération des missions
+
+```
+missions.moderation_status : 'normal' | 'suspended' | 'removed'
+```
+- Champ **indépendant** de `missions.status` (piloté par l'employeur,
+  Sprint 4c) — piloté uniquement par l'admin.
+- Une mission n'est visible aux candidats (recherche, missions suggérées,
+  tri de priorité Premium) que si `status = 'published'` **ET**
+  `moderation_status = 'normal'`.
+- Tant que `moderation_status != 'normal'`, l'employeur ne peut plus
+  éditer/mettre en pause/réactiver la mission lui-même — bloqué côté
+  serveur (Server Action) et au niveau RLS, pas seulement caché côté UI.
+- Signalement (`mission_reports`) : tout utilisateur authentifié peut
+  signaler une mission une fois (motif + détails optionnels) ; l'admin peut
+  ignorer un signalement (`dismissed`) ou agir dessus (suspension/
+  suppression le marque `reviewed`).
+- Suppression définitive bloquée si une candidature `hired` existe déjà sur
+  la mission (contrat déjà généré) — message clair, la suspension reste
+  possible dans ce cas. Sinon, les candidatures actives (`pending`/
+  `interviewing`) sont rejetées automatiquement avec notification.
+- Réactivation possible uniquement depuis `suspended`, jamais depuis
+  `removed` (volontairement définitif via l'interface).
+
+### Principe de sécurité
+
+```
+✅ Vérification serveur systématique — jamais de confiance dans un état
+   client, chaque page et chaque action admin revérifie is_admin_user()
+✅ RLS comme filet ultime — les policies Postgres sont l'autorité finale ;
+   les vérifications applicatives ne sont qu'une couche de défense en
+   profondeur supplémentaire, jamais l'unique rempart
+✅ Chemin d'accès non public — obscurité en plus du contrôle d'accès réel,
+   jamais un substitut à celui-ci
+```
+
+> ⚠️ Un incident a été trouvé et corrigé en cours de route : deux policies
+> RLS héritées du tout premier script de mise en place de la base (nommées
+> différemment des policies modernes, donc jamais remplacées par les
+> migrations suivantes) permettaient de contourner `moderation_status` par
+> un appel API direct — l'une aurait permis à un employeur de rouvrir
+> lui-même sa propre mission suspendue, l'autre rendait une mission
+> supprimée lisible même sans authentification. Détecté par test direct au
+> niveau RLS (pas seulement via l'application), corrigé en supprimant les
+> deux anciennes policies, re-vérifié après coup. Voir
+> [ARCHITECTURE_DATABASE.md](./ARCHITECTURE_DATABASE.md) pour le détail
+> schéma.
+
+---
+
 ## 🤝 Statut Candidat & Paiement
 
 Décision prise après recherche du cadre légal français et comparaison avec
@@ -780,7 +881,7 @@ Monospace: Geist Mono
 
 ## 🚫 Ce Qui Est Explicitement Écarté
 
-Noté ici pour éviter toute confusion future — ces trois points ont été
+Noté ici pour éviter toute confusion future — ces deux points ont été
 considérés puis délibérément écartés du périmètre actuel :
 
 **Pas de profil-vitrine candidat public contactable librement**
@@ -790,14 +891,6 @@ employeur et candidat reste toujours conditionné à une candidature suivie
 d'une visio. Aucune fonctionnalité (y compris le Premium employeur) ne
 doit donner un accès direct au numéro de téléphone ou à la messagerie
 d'un candidat en dehors de ce parcours.
-```
-
-**Pas de modération automatique d'annonce avec mise en pause système**
-```
-Reporté — pas d'interface admin pour l'instant. La mise en pause d'une
-mission (statut 'paused', voir Onboarding Employeur & Gestion des
-Missions) est une action manuelle de l'employeur, pas une modération
-automatisée par la plateforme.
 ```
 
 **Pas d'intégration URSSAF/CESU API automatisée dans l'immédiat**
@@ -819,7 +912,7 @@ intégration API reste hors périmètre actuel.
 | **Paiement légal** | ✅ Contrat auto + Stripe Connect (auto-entrepreneur) ou CESU (particulier employeur) | ❌ Non | ❌ Non | ✅ Partiel |
 | **Particuliers only** | ✅ Strict | ❌ Mélangé | ❌ Pros acceptés | ❌ Pros |
 | **Vérification** | ✅ Stricte | ❌ Minimal | ✅ KYC | ✅ KYC |
-| **Matching géo** | 🔜 Distance (à venir) | ❌ Non | ❌ Simple | ❌ Simple |
+| **Matching géo** | ✅ Distance (livré) | ❌ Non | ❌ Simple | ❌ Simple |
 | **Marché** | 🇫🇷 France | 🇫🇷 France | 🌍 Global | 🇫🇷 France |
 
 ---
