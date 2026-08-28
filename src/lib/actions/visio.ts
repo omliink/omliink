@@ -266,6 +266,16 @@ export async function markNoShow(meetingId: string, missionId: string, party: 'e
     throw new Error('Non autorisé')
   }
 
+  // A no-show only makes sense from 'accepted' (slot confirmed, scheduled
+  // time passed, nobody joined) — matches exactly what the UI itself gates
+  // the "signaler une absence" button on (VisioSection.tsx never shows it
+  // once status is 'in_progress', since that means someone did join).
+  // Without this guard nothing stopped calling markNoShow on an already
+  // 'completed' visio and silently corrupting a legitimate meeting record.
+  if (meeting.status !== 'accepted') {
+    throw new Error("Cette visioconférence n'est pas en attente d'un créneau dépassé — impossible de signaler une absence")
+  }
+
   const status = party === 'employer' ? 'no_show_employer' : 'no_show_candidate'
   const { error } = await supabase.from('visio_meetings').update({ status }).eq('id', meetingId)
   if (error) {
