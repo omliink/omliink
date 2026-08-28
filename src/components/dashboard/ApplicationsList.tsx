@@ -6,6 +6,7 @@ import type { Database } from '@/types/database.types'
 
 type Application = Database['public']['Tables']['applications']['Row']
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
+type Review = Database['public']['Tables']['reviews']['Row']
 
 interface ApplicationsListProps {
   applications: Application[]
@@ -14,6 +15,8 @@ interface ApplicationsListProps {
   candidateProfileById: Map<string, CandidateProfile>
   distanceByCandidateId?: Map<string, number>
   skillLabelsByCandidateId: Map<string, string[]>
+  reviewsByCandidateId?: Map<string, Review[]>
+  reviewerNameById?: Map<string, string>
 }
 
 function formatDistance(value: number) {
@@ -27,6 +30,8 @@ export default function ApplicationsList({
   candidateProfileById,
   distanceByCandidateId,
   skillLabelsByCandidateId,
+  reviewsByCandidateId,
+  reviewerNameById,
 }: ApplicationsListProps) {
   if (applications.length === 0) {
     return (
@@ -58,6 +63,8 @@ export default function ApplicationsList({
               <CandidateProfileReveal
                 profile={candidateProfileById.get(application.candidate_id) ?? null}
                 skillLabels={skillLabelsByCandidateId.get(application.candidate_id) ?? []}
+                reviews={reviewsByCandidateId?.get(application.candidate_id) ?? []}
+                reviewerNameById={reviewerNameById}
               />
             </div>
           </div>

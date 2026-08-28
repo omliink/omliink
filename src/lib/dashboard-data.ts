@@ -508,6 +508,53 @@ export async function getSuggestedCandidatesForMission(mission: Mission, limit =
     .slice(0, limit)
 }
 
+// --- Reviews (post-mission) ---
+
+type Review = Database['public']['Tables']['reviews']['Row']
+
+export async function getReviewsForUser(userId: string): Promise<Review[]> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('to_user_id', userId)
+    .order('created_at', { ascending: false })
+  return data ?? []
+}
+
+// Bulk version — a list of candidates (ApplicationsList/InterviewsList) needs
+// every candidate's received reviews in one round-trip rather than one query
+// per candidate. Grouped client-side, same pattern as
+// getCandidateSkillRowsForCandidates.
+export async function getReviewsForUsers(userIds: string[]): Promise<Map<string, Review[]>> {
+  if (userIds.length === 0) return new Map()
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('reviews')
+    .select('*')
+    .in('to_user_id', userIds)
+    .order('created_at', { ascending: false })
+
+  const byUser = new Map<string, Review[]>()
+  for (const review of data ?? []) {
+    const existing = byUser.get(review.to_user_id) ?? []
+    existing.push(review)
+    byUser.set(review.to_user_id, existing)
+  }
+  return byUser
+}
+
+export async function getReviewFromUserForMission(missionId: string, fromUserId: string): Promise<Review | null> {
+  const supabase = await createServerSupabaseClient()
+  const { data } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('mission_id', missionId)
+    .eq('from_user_id', fromUserId)
+    .maybeSingle()
+  return data
+}
+
 export async function getInvitationsForMission(missionId: string): Promise<MissionInvitation[]> {
   const supabase = await createServerSupabaseClient()
   const { data } = await supabase.from('mission_invitations').select('*').eq('mission_id', missionId)

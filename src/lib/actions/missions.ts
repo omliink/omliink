@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createServiceRoleClient } from '@/lib/supabase-service'
+import { createNotification } from '@/lib/notifications-helpers'
 
 export interface CreateMissionState {
   error?: string
@@ -257,6 +259,81 @@ export async function toggleMissionPause(missionId: string) {
   const { error } = await supabase.from('missions').update({ status: nextStatus }).eq('id', missionId)
   if (error) {
     throw new Error(error.message)
+  }
+
+  revalidatePath('/dashboard')
+  revalidatePath(`/dashboard/missions/${missionId}`)
+}
+
+// Either party (employer or the hired candidate) can mark an 'assigned'
+// mission as done — the first click is enough, no need to wait for the
+// other side. Authorization is fully re-verified here against the user's
+// own session before anything is written. The actual mutation then goes
+// through service_role rather than the caller's own session: there's no RLS
+// policy letting a candidate write to missions at all (only
+// missions_update_own/admin exist), and every value written here is a fixed
+// literal ('completed', a +1 on total_missions_completed) with no
+// user-supplied data in it — the same "fully-controlled write, no injection
+// surface" reasoning already used for the Stripe webhooks' service_role
+// usage, not a general bypass of RLS for this table.
+export async function markMissionCompleted(missionId: string) {
+  const supabase = await createServerSupabaseClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/auth/login')
+  }
+
+  const [{ data: mission }, { data: hiredApplication }] = await Promise.all([
+    supabase.from('missions').select('employer_id, status, moderation_status, title').eq('id', missionId).maybeSingle(),
+    supabase.from('applications').select('candidate_id').eq('mission_id', missionId).eq('status', 'hired').maybeSingle(),
+  ])
+  if (!mission) {
+    throw new Error('Mission introuvable')
+  }
+
+  const isEmployer = mission.employer_id === user.id
+  const isHiredCandidate = hiredApplication?.candidate_id === user.id
+  if (!isEmployer && !isHiredCandidate) {
+    throw new Error('Non autorisé')
+  }
+  if (mission.status !== 'assigned') {
+    throw new Error("Cette mission n'est pas dans un état permettant de la marquer comme terminée.")
+  }
+  if (mission.moderation_status !== 'normal') {
+    throw new Error('Cette mission est suspendue ou supprimée par la modération.')
+  }
+
+  const service = createServiceRoleClient()
+  const { error } = await service.from('missions').update({ status: 'completed' }).eq('id', missionId)
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  if (hiredApplication) {
+    const { data: candidateProfile } = await service
+      .from('candidate_profiles')
+      .select('total_missions_completed')
+      .eq('user_id', hiredApplication.candidate_id)
+      .maybeSingle()
+    if (candidateProfile) {
+      await service
+        .from('candidate_profiles')
+        .update({ total_missions_completed: candidateProfile.total_missions_completed + 1 })
+        .eq('user_id', hiredApplication.candidate_id)
+    }
+  }
+
+  const otherPartyId = isEmployer ? hiredApplication?.candidate_id : mission.employer_id
+  if (otherPartyId) {
+    await createNotification(supabase, {
+      userId: otherPartyId,
+      type: 'mission_completed',
+      title: 'Mission terminée',
+      message: `"${mission.title}" a été marquée comme terminée. Vous pouvez maintenant laisser un avis.`,
+      relatedId: missionId,
+    })
   }
 
   revalidatePath('/dashboard')

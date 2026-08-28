@@ -7,6 +7,7 @@ import type { Database } from '@/types/database.types'
 type Application = Database['public']['Tables']['applications']['Row']
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
 type VisioMeeting = Database['public']['Tables']['visio_meetings']['Row']
+type Review = Database['public']['Tables']['reviews']['Row']
 
 interface InterviewsListProps {
   applications: Application[]
@@ -16,6 +17,8 @@ interface InterviewsListProps {
   meetingByApplicationId: Map<string, VisioMeeting>
   skillLabelsByCandidateId: Map<string, string[]>
   now: number
+  reviewsByCandidateId?: Map<string, Review[]>
+  reviewerNameById?: Map<string, string>
 }
 
 export default function InterviewsList({
@@ -26,6 +29,8 @@ export default function InterviewsList({
   meetingByApplicationId,
   skillLabelsByCandidateId,
   now,
+  reviewsByCandidateId,
+  reviewerNameById,
 }: InterviewsListProps) {
   if (applications.length === 0) {
     return (
@@ -54,6 +59,8 @@ export default function InterviewsList({
               <CandidateProfileReveal
                 profile={candidateProfileById.get(application.candidate_id) ?? null}
                 skillLabels={skillLabelsByCandidateId.get(application.candidate_id) ?? []}
+                reviews={reviewsByCandidateId?.get(application.candidate_id) ?? []}
+                reviewerNameById={reviewerNameById}
               />
             </div>
             {meeting ? (

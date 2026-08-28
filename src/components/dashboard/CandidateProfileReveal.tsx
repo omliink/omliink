@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import VerificationBadge from '@/components/ui/VerificationBadge'
+import ReviewsSummary from '@/components/ui/ReviewsSummary'
 import { EXPERIENCE_LEVEL_LABELS } from '@/lib/experience-level'
 import type { Database } from '@/types/database.types'
 
 type CandidateProfile = Database['public']['Tables']['candidate_profiles']['Row']
+type Review = Database['public']['Tables']['reviews']['Row']
 
 const EMPLOYMENT_STATUS_LABELS: Record<string, string> = {
   particulier_employeur: 'Particulier employeur (emploi déclaré)',
@@ -15,9 +17,16 @@ const EMPLOYMENT_STATUS_LABELS: Record<string, string> = {
 interface CandidateProfileRevealProps {
   profile: CandidateProfile | null
   skillLabels: string[]
+  reviews?: Review[]
+  reviewerNameById?: Map<string, string>
 }
 
-export default function CandidateProfileReveal({ profile, skillLabels }: CandidateProfileRevealProps) {
+export default function CandidateProfileReveal({
+  profile,
+  skillLabels,
+  reviews = [],
+  reviewerNameById = new Map(),
+}: CandidateProfileRevealProps) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -63,6 +72,9 @@ export default function CandidateProfileReveal({ profile, skillLabels }: Candida
                   <span>{EXPERIENCE_LEVEL_LABELS[profile.experience_level] ?? profile.experience_level}</span>
                 )}
                 {profile.hourly_rate != null && <span>{profile.hourly_rate} €/h</span>}
+              </div>
+              <div className="border-t border-gray-200 pt-2">
+                <ReviewsSummary rating={profile.rating} reviews={reviews} reviewerNameById={reviewerNameById} />
               </div>
             </div>
           )}

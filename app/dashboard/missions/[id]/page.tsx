@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import StatusBadge from '@/components/ui/StatusBadge'
+import ReviewsSummary from '@/components/ui/ReviewsSummary'
 import ApplyForm from '@/components/dashboard/ApplyForm'
 import ApplicationsList from '@/components/dashboard/ApplicationsList'
 import InterviewsList from '@/components/dashboard/InterviewsList'
@@ -7,6 +8,8 @@ import ReportMissionButton from '@/components/dashboard/ReportMissionButton'
 import VisioSection from '@/components/dashboard/VisioSection'
 import ContractSection from '@/components/dashboard/ContractSection'
 import SuggestedCandidatesList from '@/components/dashboard/SuggestedCandidatesList'
+import MarkMissionCompletedButton from '@/components/dashboard/MarkMissionCompletedButton'
+import LeaveReviewSection from '@/components/dashboard/LeaveReviewSection'
 import { haversineDistanceKm } from '@/lib/geo'
 import {
   getApplicationForMissionAndCandidate,
@@ -24,6 +27,9 @@ import {
   getMissionNeeds,
   getProfile,
   getProfilesByIds,
+  getReviewFromUserForMission,
+  getReviewsForUser,
+  getReviewsForUsers,
   getSkillTaxonomy,
   getSuggestedCandidatesForMission,
   getVisioMeetingForCandidate,
@@ -88,6 +94,12 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
   const candidateNameById = new Map(candidateProfiles.map((p) => [p.id, p.full_name ?? p.email]))
   const candidateProfileById = new Map(candidateExtendedProfiles.map((p) => [p.user_id, p]))
 
+  const reviewsByCandidateId = isOwner ? await getReviewsForUsers(candidateIds) : new Map()
+  const allCandidateReviewers = [...reviewsByCandidateId.values()].flat().map((r) => r.from_user_id)
+  const candidateReviewerProfiles =
+    allCandidateReviewers.length > 0 ? await getProfilesByIds([...new Set(allCandidateReviewers)]) : []
+  const candidateReviewerNameById = new Map(candidateReviewerProfiles.map((p) => [p.id, p.full_name ?? p.email]))
+
   // Resolved once here (rather than threading raw skill rows + taxonomy
   // through ApplicationsList/InterviewsList/CandidateProfileReveal) — same
   // "find the label, fall back to the raw tag" pattern as
@@ -151,6 +163,31 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
   const contractCandidateProfile = contract
     ? (candidateProfileById.get(contract.candidate_id) ?? (await getCandidateProfile(contract.candidate_id)))
     : null
+
+  // Post-mission reviews: either party can mark 'assigned' -> 'completed',
+  // then each side (independently) can leave one review of the other. The
+  // hired candidate is derived from myApplication.status === 'hired' rather
+  // than a fresh query — myApplication already reflects this viewer's own
+  // application, no need to look it up twice.
+  const isHiredCandidate = isCandidateViewer && myApplication?.status === 'hired'
+  const canMarkCompleted = mission.status === 'assigned' && (isOwner || isHiredCandidate) && mission.moderation_status === 'normal'
+  const canReview = mission.status === 'completed' && (isOwner || isHiredCandidate)
+  const reviewToUserId = canReview ? (isOwner ? contract?.candidate_id : mission.employer_id) : null
+  const reviewToName = canReview
+    ? isOwner
+      ? (contract ? candidateNameById.get(contract.candidate_id) : null) ?? 'ce candidat'
+      : (employerProfileBasic?.full_name ?? employerProfileBasic?.email ?? 'cet employeur')
+    : null
+  const myReview =
+    canReview && reviewToUserId ? await getReviewFromUserForMission(mission.id, user.id) : null
+
+  // Employer reviews, shown to a candidate viewing this mission (public,
+  // not gated by mission status — same spirit as "Publié par [Nom]" above).
+  const employerReviews = isCandidateViewer && employerProfileBasic ? await getReviewsForUser(employerProfileBasic.id) : []
+  const employerReviewers =
+    employerReviews.length > 0 ? await getProfilesByIds([...new Set(employerReviews.map((r) => r.from_user_id))]) : []
+  const employerReviewerNameById = new Map(employerReviewers.map((p) => [p.id, p.full_name ?? p.email]))
+
   // This Server Component renders once per request — there's no re-render to
   // go stale, so the purity rule (aimed at memoized client components) does
   // not apply here.
@@ -183,6 +220,19 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             <img src={employerProfileExtended.photo_url} alt="" className="h-8 w-8 rounded-full object-cover" />
           )}
           <span>Publié par {employerProfileBasic.full_name ?? employerProfileBasic.email}</span>
+        </div>
+      )}
+
+      {isCandidateViewer && employerProfileBasic && employerProfileExtended && (
+        <div className="mt-4 rounded-xl border border-gray-100 bg-white p-4">
+          <h2 className="text-sm font-semibold text-gray-900">Avis sur {employerProfileBasic.full_name ?? employerProfileBasic.email}</h2>
+          <div className="mt-2">
+            <ReviewsSummary
+              rating={employerProfileExtended.rating}
+              reviews={employerReviews}
+              reviewerNameById={employerReviewerNameById}
+            />
+          </div>
         </div>
       )}
 
@@ -249,6 +299,8 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             candidateProfileById={candidateProfileById}
             distanceByCandidateId={distanceByCandidateId}
             skillLabelsByCandidateId={skillLabelsByCandidateId}
+            reviewsByCandidateId={reviewsByCandidateId}
+            reviewerNameById={candidateReviewerNameById}
           />
         </div>
       )}
@@ -264,6 +316,8 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
             meetingByApplicationId={meetingByApplicationId}
             skillLabelsByCandidateId={skillLabelsByCandidateId}
             now={now}
+            reviewsByCandidateId={reviewsByCandidateId}
+            reviewerNameById={candidateReviewerNameById}
           />
         </div>
       )}
@@ -295,6 +349,30 @@ export default async function MissionDetailPage({ params }: MissionDetailPagePro
           isEmployerViewer={isOwner}
           candidateProfile={contractCandidateProfile}
         />
+      )}
+
+      {canMarkCompleted && (
+        <div className="mt-10 rounded-xl border border-gray-100 bg-white p-5">
+          <h2 className="text-sm font-semibold text-gray-900">Mission terminée ?</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Une fois la mission effectuée, marquez-la comme terminée pour pouvoir laisser un avis.
+          </p>
+          <div className="mt-3">
+            <MarkMissionCompletedButton missionId={mission.id} />
+          </div>
+        </div>
+      )}
+
+      {canReview && reviewToUserId && reviewToName && (
+        <div className="mt-10 rounded-xl border border-gray-100 bg-white p-5">
+          <h2 className="text-sm font-semibold text-gray-900">Laisser un avis</h2>
+          <LeaveReviewSection
+            missionId={mission.id}
+            toUserId={reviewToUserId}
+            toName={reviewToName}
+            alreadyReviewed={Boolean(myReview)}
+          />
+        </div>
       )}
     </div>
   )
