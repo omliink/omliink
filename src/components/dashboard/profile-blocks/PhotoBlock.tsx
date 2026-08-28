@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useActionState } from 'react'
+import { startTransition, useActionState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { ProfileFormState } from '@/lib/actions/profile'
 
@@ -53,7 +53,13 @@ export default function PhotoBlock({ title, userId, bucket, photoUrl, benefits, 
 
       const fd = new FormData()
       fd.set('photo_url', publicUrl)
-      formAction(fd)
+      // useActionState's dispatcher must be invoked inside a transition —
+      // calling it bare here (outside a native form submission) triggers
+      // "An async function with useActionState was called outside of a
+      // transition" and silently breaks isPending tracking.
+      startTransition(() => {
+        formAction(fd)
+      })
     } finally {
       setIsUploading(false)
     }

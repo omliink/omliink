@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useActionState } from 'react'
+import { startTransition, useActionState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { submitVerificationDocument, type VerificationState } from '@/lib/actions/verification'
 
@@ -40,7 +40,13 @@ export default function VerificationBanner({ userId }: { userId: string }) {
       }
       const fd = new FormData()
       fd.set('document_path', documentPath)
-      formAction(fd)
+      // useActionState's dispatcher must be invoked inside a transition —
+      // calling it bare here (outside a native form submission) triggers
+      // "An async function with useActionState was called outside of a
+      // transition" and silently breaks isPending tracking.
+      startTransition(() => {
+        formAction(fd)
+      })
     } finally {
       setIsUploading(false)
     }
