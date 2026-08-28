@@ -63,17 +63,14 @@ export async function getApplicationsForMissions(missionIds: string[]): Promise<
   return data ?? []
 }
 
-// Admin-facing (the /ops-.../missions moderation list) — deliberately NOT
-// filtered by moderation_status, since the admin needs to see suspended
-// missions too (to review/reactivate them). Candidate-facing code must use
+// Admin-facing (the /ops-.../missions moderation list) — every mission
+// regardless of status or moderation_status, since the admin needs to be
+// able to find and act on a mission no matter what state it's in (not just
+// 'published' ones). Candidate-facing code must use
 // getPublishedMissionsForCandidate below instead.
-export async function getPublishedMissions(): Promise<Mission[]> {
+export async function getAllMissionsForAdmin(): Promise<Mission[]> {
   const supabase = await createServerSupabaseClient()
-  const { data } = await supabase
-    .from('missions')
-    .select('*')
-    .eq('status', 'published')
-    .order('mission_date', { ascending: true })
+  const { data } = await supabase.from('missions').select('*').order('created_at', { ascending: false })
   return data ?? []
 }
 
