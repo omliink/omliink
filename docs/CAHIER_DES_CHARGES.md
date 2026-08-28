@@ -158,6 +158,11 @@ Décision : passer d'un modèle purement transactionnel à un modèle
 Premium devient un revenu secondaire, livré et testé (Sprint 4d), pas une
 simple piste future.
 
+> ✅ Le parcours de paiement complet (page Stripe Checkout hébergée
+> incluse) a été validé manuellement avec une vraie carte test juste après
+> le sprint — capture d'écran confirmant "Vous êtes Premium ✓" avec la
+> bonne date de renouvellement. Point définitivement clos.
+
 **Abonnement Premium — 10€/mois fixe**
 - Missions actives illimitées en simultané (**gratuit : limité à 1-2
   missions actives**)

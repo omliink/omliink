@@ -601,6 +601,9 @@ Checkout de paiement de mission.
 - Flux Stripe Subscriptions (souscription, webhooks) ✅
 - Limite missions actives (gratuit vs Premium) ✅
 - Codes promo fonctionnels ✅
+- Parcours de paiement (Stripe Checkout hébergé inclus) validé
+  manuellement avec une vraie carte test — "Vous êtes Premium ✓" avec la
+  bonne date de renouvellement ✅
 
 ---
 
