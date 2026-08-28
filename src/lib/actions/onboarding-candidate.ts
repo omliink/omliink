@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { isOwnPublicStorageUrl } from '@/lib/storage-url'
 
 export interface OnboardingResult {
   error?: string
@@ -72,8 +73,12 @@ export async function submitCandidateOnboarding(formData: FormData): Promise<Onb
   }
 
   // --- step 3 ---
-  const photoFile = formData.get('photo')
-  if (!(photoFile instanceof File) || photoFile.size === 0) {
+  // Uploaded client-side before this action is called (see
+  // CandidateOnboardingWizard) — a raw File here would cross the Server
+  // Action's request body and hit Next.js's default 1MB limit on any
+  // realistically-sized photo. Only the resulting public URL travels here.
+  const photoUrl = String(formData.get('photo_url') ?? '').trim()
+  if (!photoUrl || !isOwnPublicStorageUrl(photoUrl, 'candidate-photos', user.id)) {
     return { error: 'Une photo de profil est obligatoire.' }
   }
 
@@ -107,20 +112,6 @@ export async function submitCandidateOnboarding(formData: FormData): Promise<Onb
   if (bioText.length < 30 || bioText.length > 2000) {
     return { error: 'La présentation doit contenir entre 30 et 2000 caractères.' }
   }
-
-  // --- upload photo ---
-  // No upsert: each path is timestamp-suffixed and therefore always unique,
-  // and upsert would force an ON CONFLICT DO UPDATE codepath that needs a
-  // SELECT policy on storage.objects to evaluate the conflict target — one
-  // this bucket intentionally doesn't have.
-  const photoPath = `${user.id}/${Date.now()}-${photoFile.name}`
-  const { error: uploadError } = await supabase.storage.from('candidate-photos').upload(photoPath, photoFile)
-  if (uploadError) {
-    return { error: `Échec de l'upload de la photo : ${uploadError.message}` }
-  }
-  const {
-    data: { publicUrl: photoUrl },
-  } = supabase.storage.from('candidate-photos').getPublicUrl(photoPath)
 
   // --- profiles ---
   const { error: profileError } = await supabase.from('profiles').upsert({

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { isOwnStoragePath } from '@/lib/storage-url'
 
 export interface VerificationState {
   error?: string
@@ -22,18 +23,15 @@ export async function submitVerificationDocument(
     redirect('/auth/login')
   }
 
-  const documentFile = formData.get('document')
-  if (!(documentFile instanceof File) || documentFile.size === 0) {
+  // Uploaded client-side before this action is called (see
+  // VerificationBanner) — a raw File here would cross the Server Action's
+  // request body and hit Next.js's default 1MB limit, and ID
+  // documents/scans routinely exceed that. Only the storage path travels
+  // here (this bucket is private, so there's no public URL to store —
+  // reads go through a signed URL generated on demand for admin review).
+  const documentPath = String(formData.get('document_path') ?? '').trim()
+  if (!documentPath || !isOwnStoragePath(documentPath, user.id)) {
     return { error: 'Merci de sélectionner un fichier.' }
-  }
-
-  // No upsert: the path is timestamp-suffixed and always unique, and upsert
-  // would need a SELECT policy on storage.objects (to evaluate the ON
-  // CONFLICT arbiter) that this bucket intentionally doesn't have.
-  const documentPath = `${user.id}/${Date.now()}-${documentFile.name}`
-  const { error: uploadError } = await supabase.storage.from('verification-documents').upload(documentPath, documentFile)
-  if (uploadError) {
-    return { error: `Échec de l'upload : ${uploadError.message}` }
   }
 
   const { error } = await supabase

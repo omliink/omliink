@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { supabase } from '@/lib/supabase'
 import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 import { submitCandidateOnboarding } from '@/lib/actions/onboarding-candidate'
 import type { Database } from '@/types/database.types'
@@ -9,6 +10,7 @@ type ServiceCategory = Database['public']['Tables']['service_categories']['Row']
 type SkillTaxonomy = Database['public']['Tables']['skill_taxonomy']['Row']
 
 interface CandidateOnboardingWizardProps {
+  userId: string
   email: string
   initialFullName: string | null
   initialPhone: string | null
@@ -99,6 +101,7 @@ function splitName(fullName: string | null): [string, string] {
 }
 
 export default function CandidateOnboardingWizard({
+  userId,
   email,
   initialFullName,
   initialPhone,
@@ -193,30 +196,46 @@ export default function CandidateOnboardingWizard({
   }
 
   const handleSubmitFinal = () => {
-    const fd = new FormData()
-    fd.set('gender', form.gender)
-    fd.set('first_name', form.firstName)
-    fd.set('last_name', form.lastName)
-    fd.set('location_address', form.address!.label)
-    fd.set('location_lat', String(form.address!.lat))
-    fd.set('location_lng', String(form.address!.lng))
-    fd.set('birth_date', form.birthDate)
-    fd.set('birth_place', form.birthPlace)
-    fd.set('native_language', form.nativeLanguage)
-    fd.set('phone', form.phone)
-    fd.set('phone_visible', String(form.phoneVisible))
-    fd.set('languages_json', JSON.stringify(form.languages))
-    fd.set('photo', form.photoFile as File)
-    form.serviceCategoryIds.forEach((id) => fd.append('service_categories', id))
-    form.supplementCodes.forEach((code) => fd.append('supplements', code))
-    fd.set('experience_level', form.experienceLevel)
-    fd.set('hourly_rate', String(form.hourlyRate))
-    fd.set('employment_status', form.employmentStatus)
-    fd.set('skills_json', JSON.stringify(form.selectedSkills))
-    fd.set('bio_title', form.bioTitle)
-    fd.set('bio_text', form.bioText)
-
     startTransition(async () => {
+      // Uploaded here, client -> Storage directly, rather than sent through
+      // the Server Action's request body: a raw File in that payload would
+      // cross Next.js's default 1MB Server Action limit on any realistic
+      // photo. Only the resulting public URL travels to
+      // submitCandidateOnboarding below.
+      const photoFile = form.photoFile as File
+      const photoPath = `${userId}/${Date.now()}-${photoFile.name}`
+      const { error: uploadError } = await supabase.storage.from('candidate-photos').upload(photoPath, photoFile)
+      if (uploadError) {
+        setStepError(`Échec de l'upload de la photo : ${uploadError.message}`)
+        return
+      }
+      const {
+        data: { publicUrl: photoUrl },
+      } = supabase.storage.from('candidate-photos').getPublicUrl(photoPath)
+
+      const fd = new FormData()
+      fd.set('gender', form.gender)
+      fd.set('first_name', form.firstName)
+      fd.set('last_name', form.lastName)
+      fd.set('location_address', form.address!.label)
+      fd.set('location_lat', String(form.address!.lat))
+      fd.set('location_lng', String(form.address!.lng))
+      fd.set('birth_date', form.birthDate)
+      fd.set('birth_place', form.birthPlace)
+      fd.set('native_language', form.nativeLanguage)
+      fd.set('phone', form.phone)
+      fd.set('phone_visible', String(form.phoneVisible))
+      fd.set('languages_json', JSON.stringify(form.languages))
+      fd.set('photo_url', photoUrl)
+      form.serviceCategoryIds.forEach((id) => fd.append('service_categories', id))
+      form.supplementCodes.forEach((code) => fd.append('supplements', code))
+      fd.set('experience_level', form.experienceLevel)
+      fd.set('hourly_rate', String(form.hourlyRate))
+      fd.set('employment_status', form.employmentStatus)
+      fd.set('skills_json', JSON.stringify(form.selectedSkills))
+      fd.set('bio_title', form.bioTitle)
+      fd.set('bio_text', form.bioText)
+
       const result = await submitCandidateOnboarding(fd)
       if (result.error) {
         setStepError(result.error)

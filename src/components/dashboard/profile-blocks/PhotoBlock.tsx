@@ -2,11 +2,13 @@
 
 import { useRef, useState } from 'react'
 import { useActionState } from 'react'
-import { useFormStatus } from 'react-dom'
+import { supabase } from '@/lib/supabase'
 import type { ProfileFormState } from '@/lib/actions/profile'
 
 interface PhotoBlockProps {
   title: string
+  userId: string
+  bucket: 'candidate-photos' | 'employer-photos'
   photoUrl: string | null
   benefits: string[]
   action: (prevState: ProfileFormState, formData: FormData) => Promise<ProfileFormState>
@@ -14,37 +16,57 @@ interface PhotoBlockProps {
 
 const initialState: ProfileFormState = {}
 
-function UploadButton({ disabled }: { disabled: boolean }) {
-  const { pending } = useFormStatus()
-  return (
-    <button
-      type="submit"
-      disabled={disabled || pending}
-      className="mt-4 w-fit rounded-lg bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {pending ? 'Envoi…' : 'Télécharger une photo'}
-    </button>
-  )
-}
-
-export default function PhotoBlock({ title, photoUrl, benefits, action }: PhotoBlockProps) {
-  const [state, formAction] = useActionState(action, initialState)
+export default function PhotoBlock({ title, userId, bucket, photoUrl, benefits, action }: PhotoBlockProps) {
+  const [state, formAction, isDispatching] = useActionState(action, initialState)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFileChange = (file: File | null) => {
     setSelectedFile(file)
     setPreviewUrl(file ? URL.createObjectURL(file) : null)
+    setUploadError(null)
+  }
+
+  // Uploaded client -> Storage directly here, rather than submitted as a
+  // native form (which would put the raw File in the Server Action's
+  // request body and hit Next.js's default 1MB limit on any realistic
+  // photo). Only the resulting public URL is dispatched to `action` below —
+  // still via useActionState's own dispatcher (not the raw `action`
+  // function), so `state`/error/success handling is unchanged from before.
+  const handleUpload = async () => {
+    if (!selectedFile) return
+    setUploadError(null)
+    setIsUploading(true)
+    try {
+      const photoPath = `${userId}/${Date.now()}-${selectedFile.name}`
+      const { error } = await supabase.storage.from(bucket).upload(photoPath, selectedFile)
+      if (error) {
+        setUploadError(`Échec de l'upload : ${error.message}`)
+        return
+      }
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from(bucket).getPublicUrl(photoPath)
+
+      const fd = new FormData()
+      fd.set('photo_url', publicUrl)
+      formAction(fd)
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const displayUrl = previewUrl ?? photoUrl
+  const pending = isUploading || isDispatching
 
   return (
     <section className="rounded-xl border border-gray-100 bg-white p-5">
       <h2 className="text-base font-semibold text-gray-900">{title}</h2>
 
-      <form action={formAction} className="mt-4 flex flex-col gap-6 sm:flex-row">
+      <div className="mt-4 flex flex-col gap-6 sm:flex-row">
         <div className="flex flex-shrink-0 flex-col items-center">
           <div className="relative">
             <button
@@ -82,7 +104,14 @@ export default function PhotoBlock({ title, photoUrl, benefits, action }: PhotoB
             className="hidden"
             onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
           />
-          <UploadButton disabled={!selectedFile} />
+          <button
+            type="button"
+            disabled={!selectedFile || pending}
+            onClick={handleUpload}
+            className="mt-4 w-fit rounded-lg bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {pending ? 'Envoi…' : 'Télécharger une photo'}
+          </button>
         </div>
 
         <div className="flex-1">
@@ -95,9 +124,9 @@ export default function PhotoBlock({ title, photoUrl, benefits, action }: PhotoB
             ))}
           </ul>
           {selectedFile && <p className="mt-3 text-sm text-emerald-600">Photo sélectionnée : {selectedFile.name}</p>}
-          {state.error && (
+          {(uploadError || state.error) && (
             <p role="alert" className="mt-3 text-sm text-red-600">
-              {state.error}
+              {uploadError ?? state.error}
             </p>
           )}
           {state.success && (
@@ -106,7 +135,7 @@ export default function PhotoBlock({ title, photoUrl, benefits, action }: PhotoB
             </p>
           )}
         </div>
-      </form>
+      </div>
     </section>
   )
 }

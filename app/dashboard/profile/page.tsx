@@ -78,7 +78,7 @@ export default async function ProfilePage() {
             <h2 className="text-base font-semibold text-gray-900">Vérification de profil</h2>
             <div className="mt-4">
               {candidateProfile.verification_status === 'unverified' ? (
-                <VerificationBanner />
+                <VerificationBanner userId={user.id} />
               ) : (
                 <p className="text-sm text-gray-600">
                   Statut actuel : <VerificationBadge status={candidateProfile.verification_status} />
@@ -89,6 +89,8 @@ export default async function ProfilePage() {
 
           <PhotoBlock
             title="Photo"
+            userId={user.id}
+            bucket="candidate-photos"
             photoUrl={candidateProfile.photo_url}
             benefits={[
               'Les profils avec photo reçoivent bien plus de réponses',
@@ -130,6 +132,8 @@ export default async function ProfilePage() {
 
           <PhotoBlock
             title="Photo"
+            userId={user.id}
+            bucket="employer-photos"
             photoUrl={employerProfile.photo_url}
             benefits={[
               'Rassure les candidats avant l’entretien visio',

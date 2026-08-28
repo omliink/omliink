@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { isOwnPublicStorageUrl } from '@/lib/storage-url'
 import type { Database } from '@/types/database.types'
 
 type CandidateProfileUpdate = Database['public']['Tables']['candidate_profiles']['Update']
@@ -33,21 +34,15 @@ export async function updateCandidatePhoto(
   } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const photoFile = formData.get('photo')
-  if (!(photoFile instanceof File) || photoFile.size === 0) {
+  // Uploaded client-side before this action is called (see PhotoBlock) — a
+  // raw File here would cross the Server Action's request body and hit
+  // Next.js's default 1MB limit on any realistically-sized photo.
+  const photoUrl = String(formData.get('photo_url') ?? '').trim()
+  if (!photoUrl || !isOwnPublicStorageUrl(photoUrl, 'candidate-photos', user.id)) {
     return { error: 'Merci de sélectionner une photo.' }
   }
 
-  const photoPath = `${user.id}/${Date.now()}-${photoFile.name}`
-  const { error: uploadError } = await supabase.storage.from('candidate-photos').upload(photoPath, photoFile)
-  if (uploadError) {
-    return { error: `Échec de l'upload : ${uploadError.message}` }
-  }
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from('candidate-photos').getPublicUrl(photoPath)
-
-  const { error } = await supabase.from('candidate_profiles').update({ photo_url: publicUrl }).eq('user_id', user.id)
+  const { error } = await supabase.from('candidate_profiles').update({ photo_url: photoUrl }).eq('user_id', user.id)
   if (error) return { error: error.message }
 
   revalidatePath('/dashboard/profile')
@@ -305,21 +300,15 @@ export async function updateEmployerPhoto(
   } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
-  const photoFile = formData.get('photo')
-  if (!(photoFile instanceof File) || photoFile.size === 0) {
+  // Uploaded client-side before this action is called (see PhotoBlock) — a
+  // raw File here would cross the Server Action's request body and hit
+  // Next.js's default 1MB limit on any realistically-sized photo.
+  const photoUrl = String(formData.get('photo_url') ?? '').trim()
+  if (!photoUrl || !isOwnPublicStorageUrl(photoUrl, 'employer-photos', user.id)) {
     return { error: 'Merci de sélectionner une photo.' }
   }
 
-  const photoPath = `${user.id}/${Date.now()}-${photoFile.name}`
-  const { error: uploadError } = await supabase.storage.from('employer-photos').upload(photoPath, photoFile)
-  if (uploadError) {
-    return { error: `Échec de l'upload : ${uploadError.message}` }
-  }
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from('employer-photos').getPublicUrl(photoPath)
-
-  const { error } = await supabase.from('employer_profiles').update({ photo_url: publicUrl }).eq('user_id', user.id)
+  const { error } = await supabase.from('employer_profiles').update({ photo_url: photoUrl }).eq('user_id', user.id)
   if (error) return { error: error.message }
 
   revalidatePath('/dashboard/profile')

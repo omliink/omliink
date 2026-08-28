@@ -40,6 +40,7 @@ export default function OnboardingForm({
   if (showCandidateWizard) {
     return (
       <CandidateOnboardingWizard
+        userId={userId}
         email={email}
         initialFullName={fullName}
         initialPhone={phone}
